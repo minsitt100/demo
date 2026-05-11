@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cafe Notes — a little journal of cafes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="paper-grain" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <div class="header-inner">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">☕</span>
+          <div>
+            <h1>Cafe Notes</h1>
+            <p class="brand-sub">a little journal of places I'd like to remember</p>
+          </div>
+        </div>
+        <nav class="tabs" role="tablist">
+          <button class="tab is-active" data-tab="cafes" role="tab">My Cafes</button>
+          <button class="tab" data-tab="build" role="tab">Build a Cafe</button>
+          <button class="tab" data-tab="insights" role="tab">Insights</button>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <!-- ============ My Cafes ============ -->
+      <section class="view is-active" data-view="cafes">
+        <div class="view-head">
+          <div>
+            <h2 class="view-title">My Cafes</h2>
+            <p class="view-sub">Every visit, jotted down like a postcard.</p>
+          </div>
+          <button class="btn primary" id="add-cafe-btn">＋ New cafe</button>
+        </div>
+
+        <div class="cafe-grid" id="cafe-grid"></div>
+
+        <div class="empty" id="cafes-empty" hidden>
+          <div class="empty-art">✦ ✿ ✦</div>
+          <h3>Your shelf is empty.</h3>
+          <p>Add your first cafe to start a small collection of moments.</p>
+          <button class="btn primary" data-action="open-add">＋ Add a cafe</button>
+        </div>
+      </section>
+
+      <!-- ============ Build a Cafe ============ -->
+      <section class="view" data-view="build">
+        <div class="view-head">
+          <div>
+            <h2 class="view-title">Build a Cafe</h2>
+            <p class="view-sub">Mix-and-match the bits you love into your dream place.</p>
+          </div>
+          <button class="btn ghost" id="reset-dream">Start over</button>
+        </div>
+
+        <div class="dream-grid">
+          <aside class="palette">
+            <h3>Palette</h3>
+            <p class="palette-hint">Drag or tap pieces from cafes you've visited.</p>
+            <div class="palette-tabs">
+              <button class="ptab is-active" data-ptab="menu">Menu</button>
+              <button class="ptab" data-ptab="vibe">Vibe</button>
+              <button class="ptab" data-ptab="brand">Branding</button>
+            </div>
+            <div class="palette-body" id="palette-body"></div>
+          </aside>
+
+          <div class="dream-card">
+            <div class="dream-card-head">
+              <input
+                class="dream-name"
+                id="dream-name"
+                placeholder="Name your cafe…"
+                maxlength="40"
+              />
+              <span class="dream-pin">your cafe</span>
+            </div>
+
+            <div class="dream-section">
+              <h4>Menu</h4>
+              <ul class="dream-list" id="dream-menu" data-bucket="menu"></ul>
+              <p class="dream-empty">Pick pastries, drinks, anything that made you happy.</p>
+            </div>
+
+            <div class="dream-section">
+              <h4>Vibe</h4>
+              <ul class="dream-list" id="dream-vibe" data-bucket="vibe"></ul>
+              <p class="dream-empty">A corner booth, soft jazz, a sunlit window…</p>
+            </div>
+
+            <div class="dream-section">
+              <h4>Branding</h4>
+              <ul class="dream-list" id="dream-brand" data-bucket="brand"></ul>
+              <p class="dream-empty">Cup styles, logos, the little touches.</p>
+            </div>
+
+            <div class="suggestions" id="suggestions" hidden>
+              <h4>Suggestions for you</h4>
+              <p class="suggestions-sub">Based on patterns in what you've rated highly.</p>
+              <ul id="suggestion-list"></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ Insights ============ -->
+      <section class="view" data-view="insights">
+        <div class="view-head">
+          <div>
+            <h2 class="view-title">Insights</h2>
+            <p class="view-sub">Quiet patterns from the places you've loved.</p>
+          </div>
+        </div>
+        <div class="insights" id="insights"></div>
+      </section>
+    </main>
+
+    <!-- ============ Add / Edit modal ============ -->
+    <div class="modal" id="cafe-modal" hidden>
+      <div class="modal-scrim" data-close="1"></div>
+      <div class="modal-card" role="dialog" aria-modal="true">
+        <button class="modal-x" data-close="1" aria-label="close">×</button>
+        <h2 class="modal-title" id="modal-title">A new cafe</h2>
+        <p class="modal-sub" id="modal-sub">Take a breath, then jot it down.</p>
+
+        <form id="cafe-form" class="cafe-form" autocomplete="off">
+          <div class="row">
+            <label class="field">
+              <span>Name</span>
+              <input name="name" required maxlength="60" placeholder="Blue Bottle, etc." />
+            </label>
+            <label class="field">
+              <span>Neighborhood</span>
+              <input name="location" maxlength="60" placeholder="Hayes Valley" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Visit date</span>
+            <input name="date" type="date" />
+          </label>
+
+          <fieldset class="ratings">
+            <legend>How was it?</legend>
+            <p class="hint">Five beans is heaven. One is "well, I tried."</p>
+            <div class="rating-grid" id="rating-grid"></div>
+          </fieldset>
+
+          <fieldset class="bucket">
+            <legend>Pastries & menu items</legend>
+            <p class="hint">Type and press Enter. Add the apricot croissant.</p>
+            <div class="chips" data-bucket="menu"></div>
+            <input class="chip-input" data-bucket="menu" placeholder="apricot croissant…" />
+          </fieldset>
+
+          <fieldset class="bucket">
+            <legend>Vibe details</legend>
+            <p class="hint">Lighting, music, seat-by-the-window things.</p>
+            <div class="chips" data-bucket="vibe"></div>
+            <input class="chip-input" data-bucket="vibe" placeholder="afternoon light, soft jazz…" />
+          </fieldset>
+
+          <fieldset class="bucket">
+            <legend>Branding & details</legend>
+            <p class="hint">Cup, logo, paper sleeve, the small loving things.</p>
+            <div class="chips" data-bucket="brand"></div>
+            <input class="chip-input" data-bucket="brand" placeholder="ribbed ceramic cup…" />
+          </fieldset>
+
+          <label class="field">
+            <span>A little note</span>
+            <textarea name="note" rows="3" maxlength="500" placeholder="What did this place feel like?"></textarea>
+          </label>
+
+          <div class="modal-actions">
+            <button type="button" class="btn ghost" data-close="1">Cancel</button>
+            <button type="submit" class="btn primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ============ Cafe detail modal ============ -->
+    <div class="modal" id="detail-modal" hidden>
+      <div class="modal-scrim" data-close="1"></div>
+      <div class="modal-card" role="dialog" aria-modal="true">
+        <button class="modal-x" data-close="1" aria-label="close">×</button>
+        <div id="detail-body"></div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script src="./data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
