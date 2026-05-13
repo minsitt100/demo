@@ -60,7 +60,7 @@
         <h1 class="page-title">Overview</h1>
       </div>
       <div class="overview-grid">
-        <section class="card span-8">
+        <section class="card span-12">
           <div class="card-header">
             <h2 class="card-title">Bills to Pay
               <span class="info-icon" title="Bills awaiting payment">
@@ -90,12 +90,12 @@
           </div>
         </section>
 
-        <section class="card span-4">
+        <section class="card span-12">
           <div class="card-header">
             <h2 class="card-title">Open Invoices</h2>
             <button class="btn" data-action="create-invoice">Create Invoice</button>
           </div>
-          <div class="kpi-row compact">
+          <div class="kpi-row">
             <div class="kpi kpi-urgent">
               <div class="kpi-label">Overdue</div>
               <div class="kpi-value">$0</div>
@@ -116,7 +116,7 @@
           </div>
         </section>
 
-        <section class="card span-4">
+        <section class="card span-12">
           <div class="card-header">
             <h2 class="card-title">Bill Approvals</h2>
             <label class="toggle">
@@ -154,7 +154,7 @@
           </table>
         </section>
 
-        <section class="card span-4">
+        <section class="card span-6">
           <div class="card-header">
             <h2 class="card-title">Payments In</h2>
             <button class="btn" data-action="get-paid">Get Paid</button>
@@ -162,7 +162,7 @@
           ${paymentsBlock()}
         </section>
 
-        <section class="card span-4">
+        <section class="card span-6">
           <div class="card-header">
             <h2 class="card-title">Payments Out</h2>
           </div>

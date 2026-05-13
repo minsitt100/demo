@@ -309,10 +309,12 @@ button { font-family: inherit; cursor: pointer; }
   grid-template-columns: repeat(12, 1fr);
   gap: 24px;
 }
+.span-12 { grid-column: span 12; }
 .span-8 { grid-column: span 8; }
+.span-6 { grid-column: span 6; }
 .span-4 { grid-column: span 4; }
 @media (max-width: 1199px) {
-  .span-8, .span-4 { grid-column: span 12; }
+  .span-8, .span-6, .span-4 { grid-column: span 12; }
 }
 
 /* KPI boxes */
