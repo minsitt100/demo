@@ -138,17 +138,17 @@
             <tbody>
               <tr>
                 <td>Jane Doe</td>
-                <td><div class="cell-count">0</div><div class="cell-amount">$0</div></td>
-                <td><div class="cell-count">0</div><div class="cell-amount">$0</div></td>
-                <td><div class="cell-count">0</div><div class="cell-amount">$0</div></td>
-                <td><div class="cell-count">0</div><div class="cell-amount">$0</div></td>
+                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
               </tr>
               <tr>
                 <td>Alex Kim</td>
-                <td><div class="cell-count">0</div><div class="cell-amount">$0</div></td>
-                <td><div class="cell-count">0</div><div class="cell-amount">$0</div></td>
-                <td><div class="cell-count">0</div><div class="cell-amount">$0</div></td>
-                <td><div class="cell-count">0</div><div class="cell-amount">$0</div></td>
+                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
               </tr>
             </tbody>
           </table>
@@ -176,6 +176,10 @@
         alert(`Action: ${e.currentTarget.dataset.action}`);
       });
     });
+
+    content.querySelectorAll('[data-amount-link]').forEach((el) => {
+      el.addEventListener('click', () => navigate('inbox'));
+    });
   }
 
   function paymentsBlock() {
@@ -183,14 +187,14 @@
       <div class="pay-section">
         <div>
           <div class="pay-block-label">Upcoming</div>
-          <div class="pay-row"><span class="pay-row-label">Today</span><span class="pay-row-value">$0</span></div>
-          <div class="pay-row"><span class="pay-row-label">Next 7 days</span><span class="pay-row-value">$0</span></div>
-          <div class="pay-row"><span class="pay-row-label">Next 30 days</span><span class="pay-row-value">$0</span></div>
+          <div class="pay-row"><span class="pay-row-label">Today</span><button class="amount-link" data-amount-link>$0</button></div>
+          <div class="pay-row"><span class="pay-row-label">Next 7 days</span><button class="amount-link" data-amount-link>$0</button></div>
+          <div class="pay-row"><span class="pay-row-label">Next 30 days</span><button class="amount-link" data-amount-link>$0</button></div>
         </div>
         <div>
           <div class="pay-block-label">Past</div>
-          <div class="pay-row"><span class="pay-row-label">Last 7 days</span><span class="pay-row-value">$0</span></div>
-          <div class="pay-row"><span class="pay-row-label">Last 30 days</span><span class="pay-row-value">$0</span></div>
+          <div class="pay-row"><span class="pay-row-label">Last 7 days</span><button class="amount-link" data-amount-link>$0</button></div>
+          <div class="pay-row"><span class="pay-row-label">Last 30 days</span><button class="amount-link" data-amount-link>$0</button></div>
         </div>
       </div>
     `;
