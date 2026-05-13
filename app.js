@@ -90,7 +90,7 @@
           </div>
         </section>
 
-        <section class="card span-6">
+        <section class="card span-6 row-start">
           <div class="card-header">
             <h2 class="card-title">Open Invoices</h2>
             <button class="btn" data-action="create-invoice">Create Invoice</button>
@@ -116,7 +116,7 @@
           </div>
         </section>
 
-        <section class="card span-6">
+        <section class="card span-6 row-start">
           <div class="card-header">
             <h2 class="card-title">Bill Approvals</h2>
             <label class="toggle">
@@ -154,7 +154,7 @@
           </table>
         </section>
 
-        <section class="card span-3">
+        <section class="card span-3 row-start">
           <div class="card-header">
             <h2 class="card-title">Payments In</h2>
             <button class="btn" data-action="get-paid">Get Paid</button>
