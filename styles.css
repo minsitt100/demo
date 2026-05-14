@@ -234,6 +234,7 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 6px;
   color: var(--text);
   font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -244,7 +245,7 @@ button { font-family: inherit; cursor: pointer; }
 .nav-item.active {
   background: var(--bg);
   color: var(--secondary);
-  font-weight: 600;
+  font-weight: 700;
 }
 .nav-icon {
   width: 18px;
