@@ -17,6 +17,7 @@
   const routes = {
     overview: renderOverview,
     inbox: renderInbox,
+    documents: () => placeholder('Documents'),
     'review-save': renderReviewSave,
     vendors: () => placeholder('Vendors'),
     approvals: () => placeholder('Approvals'),
