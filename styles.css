@@ -196,6 +196,31 @@ button { font-family: inherit; cursor: pointer; }
 .layout.nav-collapsed .nav-label { display: none; }
 .layout.nav-collapsed .nav-item { justify-content: center; }
 
+.nav-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--secondary);
+  background: var(--bg);
+  color: var(--secondary);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.nav-action-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--secondary-hover);
+  color: var(--secondary-hover);
+}
+.layout.nav-collapsed .nav-action-label { display: none; }
+.layout.nav-collapsed .nav-action-btn { padding: 10px 0; }
+
 .nav-group {
   display: flex;
   flex-direction: column;
