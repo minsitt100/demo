@@ -71,23 +71,26 @@
             </h2>
             <button class="btn" data-action="pay">Pay</button>
           </div>
-          <div class="kpi-row">
+          <div class="kpi-row kpi-row--flat">
             <div class="kpi kpi-urgent">
               <div class="kpi-label">Overdue</div>
               <div class="kpi-value">$0</div>
+              <div class="kpi-sub">0 BILLS</div>
             </div>
             <div class="kpi kpi-warning">
               <div class="kpi-label">Due 7 Days</div>
               <div class="kpi-value">$0</div>
+              <div class="kpi-sub">0 BILLS</div>
             </div>
             <div class="kpi">
               <div class="kpi-label">Due 7+ Days</div>
               <div class="kpi-value">$0</div>
+              <div class="kpi-sub">0 BILLS</div>
             </div>
             <div class="kpi">
               <div class="kpi-label">Total to pay</div>
               <div class="kpi-value">$0</div>
-              <div class="kpi-sub">0 bills</div>
+              <div class="kpi-sub">0 BILLS</div>
             </div>
           </div>
         </section>
