@@ -190,6 +190,7 @@ button { font-family: inherit; cursor: pointer; }
   padding: 12px 8px;
   overflow-y: auto;
   transition: width 0.2s ease;
+  font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 .layout.nav-collapsed .sidenav { width: var(--sidenav-w-collapsed); }
 .layout.nav-collapsed .nav-item span:not(.nav-dot) { display: none; }
