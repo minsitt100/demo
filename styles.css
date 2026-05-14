@@ -232,7 +232,7 @@ button { font-family: inherit; cursor: pointer; }
   gap: 10px;
   padding: 10px 12px;
   border-radius: 6px;
-  color: var(--text);
+  color: #4C5158;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
