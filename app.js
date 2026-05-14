@@ -29,7 +29,7 @@
     'payments-in': () => placeholder('Payments In'),
     reports: () => placeholder('Reports'),
     settings: () => placeholder('Settings'),
-    health: () => placeholder('Health Center'),
+    help: () => placeholder('Help Center'),
   };
 
   document.querySelectorAll('.nav-item').forEach((el) => {
