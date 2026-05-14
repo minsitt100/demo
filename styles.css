@@ -294,7 +294,7 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--bg);
   color: var(--secondary);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 .btn:hover { background: var(--bg-secondary); border-color: var(--secondary-hover); color: var(--secondary-hover); }
