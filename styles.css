@@ -394,6 +394,9 @@ button { font-family: inherit; cursor: pointer; }
   background: transparent;
   padding: 0;
 }
+.kpi-row--flat .kpi-label {
+  margin-bottom: 14px;
+}
 .kpi-row--flat .kpi-value {
   font-size: 14px;
   font-weight: 700;
@@ -403,7 +406,7 @@ button { font-family: inherit; cursor: pointer; }
   font-weight: 600;
   letter-spacing: 0.4px;
   color: var(--text-secondary);
-  margin-top: 4px;
+  margin-top: 12px;
 }
 
 /* Approvals table */

@@ -102,23 +102,26 @@
             <h2 class="card-title">Open Invoices</h2>
             <button class="btn" data-action="create-invoice">Create Invoice</button>
           </div>
-          <div class="kpi-row">
+          <div class="kpi-row kpi-row--flat">
             <div class="kpi kpi-urgent">
               <div class="kpi-label">Overdue</div>
               <div class="kpi-value">$0</div>
+              <div class="kpi-sub">0 INVOICES</div>
             </div>
             <div class="kpi kpi-warning">
               <div class="kpi-label">Due 7 Days</div>
               <div class="kpi-value">$0</div>
+              <div class="kpi-sub">0 INVOICES</div>
             </div>
             <div class="kpi">
               <div class="kpi-label">Due 7+ Days</div>
               <div class="kpi-value">$0</div>
+              <div class="kpi-sub">0 INVOICES</div>
             </div>
             <div class="kpi">
               <div class="kpi-label">Total owed</div>
               <div class="kpi-value">$0</div>
-              <div class="kpi-sub">0 invoices</div>
+              <div class="kpi-sub">0 INVOICES</div>
             </div>
           </div>
         </section>
