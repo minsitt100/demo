@@ -237,7 +237,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .nav-item.active .nav-dot { background: var(--secondary); }
 .nav-divider {
-  height: 1px;
+  height: 2px;
   background: var(--secondary);
   margin: 8px 12px;
 }
