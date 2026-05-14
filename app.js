@@ -55,136 +55,161 @@
   }
 
   // ===== Overview =====
-  function renderOverview() {
-    content.innerHTML = `
-      <div class="page-header">
-        <h1 class="page-title">Overview</h1>
+  const DEFAULT_OVERVIEW_ORDER = ['bills-to-pay', 'open-invoices', 'bill-approvals', 'payments-in', 'payments-out'];
+  let overviewOrder = (() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('overview-order'));
+      if (Array.isArray(stored)
+          && stored.length === DEFAULT_OVERVIEW_ORDER.length
+          && DEFAULT_OVERVIEW_ORDER.every((id) => stored.includes(id))) {
+        return stored;
+      }
+    } catch (e) {}
+    return DEFAULT_OVERVIEW_ORDER.slice();
+  })();
+  let customizing = false;
+
+  function moveControls(id, index) {
+    const upDisabled = index === 0 ? 'disabled' : '';
+    const downDisabled = index === overviewOrder.length - 1 ? 'disabled' : '';
+    return `
+      <div class="move-controls">
+        <button class="move-btn" data-move="up" data-id="${id}" ${upDisabled} aria-label="Move up">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
+        <button class="move-btn" data-move="down" data-id="${id}" ${downDisabled} aria-label="Move down">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
       </div>
-      <div class="overview-grid">
-        <div class="overview-row">
-        <section class="card">
-          <div class="card-header">
-            <h2 class="card-title">Bills to Pay
-              <span class="info-icon" title="Bills awaiting payment">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              </span>
-            </h2>
-            <button class="btn" data-action="pay">Pay</button>
-          </div>
-          <div class="kpi-row kpi-row--flat">
-            <div class="kpi kpi-urgent">
-              <div class="kpi-label">Overdue</div>
-              <div class="kpi-value">$0</div>
-              <div class="kpi-sub">0 BILLS</div>
-            </div>
-            <div class="kpi kpi-warning">
-              <div class="kpi-label">Due 7 Days</div>
-              <div class="kpi-value">$0</div>
-              <div class="kpi-sub">0 BILLS</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Due 7+ Days</div>
-              <div class="kpi-value">$0</div>
-              <div class="kpi-sub">0 BILLS</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Total to pay</div>
-              <div class="kpi-value">$0</div>
-              <div class="kpi-sub">0 BILLS</div>
-            </div>
-          </div>
-        </section>
+    `;
+  }
 
-        </div>
-        <div class="overview-row">
-        <section class="card">
-          <div class="card-header">
-            <h2 class="card-title">Open Invoices</h2>
-            <button class="btn" data-action="create-invoice">Create Invoice</button>
-          </div>
-          <div class="kpi-row kpi-row--flat">
-            <div class="kpi kpi-urgent">
-              <div class="kpi-label">Overdue</div>
-              <div class="kpi-value">$0</div>
-              <div class="kpi-sub">0 INVOICES</div>
-            </div>
-            <div class="kpi kpi-warning">
-              <div class="kpi-label">Due 7 Days</div>
-              <div class="kpi-value">$0</div>
-              <div class="kpi-sub">0 INVOICES</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Due 7+ Days</div>
-              <div class="kpi-value">$0</div>
-              <div class="kpi-sub">0 INVOICES</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Total owed</div>
-              <div class="kpi-value">$0</div>
-              <div class="kpi-sub">0 INVOICES</div>
-            </div>
-          </div>
-        </section>
+  function headerAction(id, index, defaultAction) {
+    return customizing ? moveControls(id, index) : defaultAction;
+  }
 
+  const cardRenderers = {
+    'bills-to-pay': (id, index) => `
+      <section class="card${customizing ? ' card--customizing' : ''}">
+        <div class="card-header">
+          <h2 class="card-title">Bills to Pay
+            <span class="info-icon" title="Bills awaiting payment">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </span>
+          </h2>
+          ${headerAction(id, index, `<button class="btn" data-action="pay">Pay</button>`)}
         </div>
-        <div class="overview-row">
-        <section class="card">
-          <div class="card-header">
-            <h2 class="card-title">Bill Approvals</h2>
+        <div class="kpi-row kpi-row--flat">
+          <div class="kpi kpi-urgent"><div class="kpi-label">Overdue</div><div class="kpi-value">$0</div><div class="kpi-sub">0 BILLS</div></div>
+          <div class="kpi kpi-warning"><div class="kpi-label">Due 7 Days</div><div class="kpi-value">$0</div><div class="kpi-sub">0 BILLS</div></div>
+          <div class="kpi"><div class="kpi-label">Due 7+ Days</div><div class="kpi-value">$0</div><div class="kpi-sub">0 BILLS</div></div>
+          <div class="kpi"><div class="kpi-label">Total to pay</div><div class="kpi-value">$0</div><div class="kpi-sub">0 BILLS</div></div>
+        </div>
+      </section>
+    `,
+    'open-invoices': (id, index) => `
+      <section class="card${customizing ? ' card--customizing' : ''}">
+        <div class="card-header">
+          <h2 class="card-title">Open Invoices</h2>
+          ${headerAction(id, index, `<button class="btn" data-action="create-invoice">Create Invoice</button>`)}
+        </div>
+        <div class="kpi-row kpi-row--flat">
+          <div class="kpi kpi-urgent"><div class="kpi-label">Overdue</div><div class="kpi-value">$0</div><div class="kpi-sub">0 INVOICES</div></div>
+          <div class="kpi kpi-warning"><div class="kpi-label">Due 7 Days</div><div class="kpi-value">$0</div><div class="kpi-sub">0 INVOICES</div></div>
+          <div class="kpi"><div class="kpi-label">Due 7+ Days</div><div class="kpi-value">$0</div><div class="kpi-sub">0 INVOICES</div></div>
+          <div class="kpi"><div class="kpi-label">Total owed</div><div class="kpi-value">$0</div><div class="kpi-sub">0 INVOICES</div></div>
+        </div>
+      </section>
+    `,
+    'bill-approvals': (id, index) => `
+      <section class="card${customizing ? ' card--customizing' : ''}">
+        <div class="card-header">
+          <h2 class="card-title">Bill Approvals</h2>
+          ${headerAction(id, index, `
             <label class="toggle">
               <input type="checkbox" id="assigned-to-me" />
               <span class="toggle-track"></span>
               Assigned to me
             </label>
-          </div>
-          <table class="approvals-table">
-            <thead>
-              <tr>
-                <th>Approver</th>
-                <th>0–5 Days</th>
-                <th>6–10 Days</th>
-                <th>10+ Days</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Jane Doe</td>
-                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
-                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
-                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
-                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
-              </tr>
-              <tr>
-                <td>Alex Kim</td>
-                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
-                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
-                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
-                <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
-              </tr>
-            </tbody>
-          </table>
-        </section>
-
+          `)}
         </div>
-        <div class="overview-row">
-        <section class="card">
-          <div class="card-header">
-            <h2 class="card-title">Payments In</h2>
-            <button class="btn" data-action="get-paid">Get Paid</button>
-          </div>
-          ${paymentsBlock()}
-        </section>
-
-        <section class="card">
-          <div class="card-header">
-            <h2 class="card-title">Payments Out</h2>
-          </div>
-          ${paymentsBlock()}
-        </section>
+        <table class="approvals-table">
+          <thead>
+            <tr><th>Approver</th><th>0–5 Days</th><th>6–10 Days</th><th>10+ Days</th><th>Total</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Jane Doe</td>
+              <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+              <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+              <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+              <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+            </tr>
+            <tr>
+              <td>Alex Kim</td>
+              <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+              <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+              <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+              <td><div class="cell-count">0</div><button class="amount-link cell-amount" data-amount-link>$0</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    `,
+    'payments-in': (id, index) => `
+      <section class="card${customizing ? ' card--customizing' : ''}">
+        <div class="card-header">
+          <h2 class="card-title">Payments In</h2>
+          ${headerAction(id, index, `<button class="btn" data-action="get-paid">Get Paid</button>`)}
         </div>
+        ${paymentsBlock()}
+      </section>
+    `,
+    'payments-out': (id, index) => `
+      <section class="card${customizing ? ' card--customizing' : ''}">
+        <div class="card-header">
+          <h2 class="card-title">Payments Out</h2>
+          ${customizing ? moveControls(id, index) : ''}
+        </div>
+        ${paymentsBlock()}
+      </section>
+    `,
+  };
+
+  function renderOverview() {
+    content.innerHTML = `
+      <div class="page-header">
+        <button class="customize-btn" id="customize-toggle">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+          <span>${customizing ? 'Done Customizing' : 'Customize Overview'}</span>
+        </button>
+      </div>
+      <div class="overview-grid">
+        ${overviewOrder.map((id, i) => `
+          <div class="overview-row">
+            ${cardRenderers[id](id, i)}
+          </div>
+        `).join('')}
       </div>
     `;
+
+    document.getElementById('customize-toggle').addEventListener('click', () => {
+      customizing = !customizing;
+      renderOverview();
+    });
+
+    content.querySelectorAll('[data-move]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const dir = e.currentTarget.dataset.move;
+        const id = e.currentTarget.dataset.id;
+        const idx = overviewOrder.indexOf(id);
+        const target = dir === 'up' ? idx - 1 : idx + 1;
+        if (target < 0 || target >= overviewOrder.length) return;
+        [overviewOrder[idx], overviewOrder[target]] = [overviewOrder[target], overviewOrder[idx]];
+        try { localStorage.setItem('overview-order', JSON.stringify(overviewOrder)); } catch (e) {}
+        renderOverview();
+      });
+    });
 
     content.querySelectorAll('[data-action]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
