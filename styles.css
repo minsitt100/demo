@@ -203,10 +203,10 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: 6px;
   color: var(--text);
-  font-size: 14px;
+  font-size: 16px;
   cursor: pointer;
   white-space: nowrap;
 }
