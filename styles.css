@@ -23,6 +23,7 @@
   --info-bg: #EAF6FF;
   --active-premium: #094A60;
   --border: #E3E7EB;
+  --border-light: #EEF1F4;
 
   --topbar-h: 60px;
   --sidenav-w: 240px;
@@ -287,6 +288,8 @@ button { font-family: inherit; cursor: pointer; }
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-light);
 }
 .card-title {
   display: inline-flex;
