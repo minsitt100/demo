@@ -262,10 +262,20 @@
         <h1 class="page-title">Inbox</h1>
         <div class="page-subtitle" style="color:var(--text-secondary);font-size:13px;">${invoices.length} invoices from your vendors</div>
       </div>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="upload-input" accept="application/pdf" multiple hidden />
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <div class="upload-text">Drop PDF invoices here or <span class="upload-link">browse files</span></div>
+        <div class="upload-hint">We'll pull out the key invoice details for you.</div>
+        <div class="upload-status" id="upload-status"></div>
+      </div>
       <div class="inbox-grid">
         ${invoices.map(invoiceCard).join('')}
       </div>
     `;
+
     content.querySelectorAll('[data-cta]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = btn.dataset.id;
@@ -278,6 +288,212 @@
         }
       });
     });
+
+    const zone = document.getElementById('upload-zone');
+    const input = document.getElementById('upload-input');
+    const status = document.getElementById('upload-status');
+
+    zone.addEventListener('click', (e) => {
+      if (e.target.tagName === 'INPUT') return;
+      input.click();
+    });
+    input.addEventListener('change', (e) => handleUploads(e.target.files, status));
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      handleUploads(e.dataTransfer.files, status);
+    });
+  }
+
+  async function handleUploads(fileList, statusEl) {
+    const files = Array.from(fileList || []).filter((f) => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
+    if (!files.length) {
+      if (statusEl) statusEl.textContent = 'Only PDF files are supported.';
+      return;
+    }
+    if (statusEl) statusEl.textContent = `Reading ${files.length} file${files.length > 1 ? 's' : ''}…`;
+    try {
+      for (const file of files) {
+        const inv = await ingestUploadedPdf(file);
+        invoices.unshift(inv);
+      }
+      if (statusEl) statusEl.textContent = `Imported ${files.length} invoice${files.length > 1 ? 's' : ''}.`;
+      renderInbox();
+    } catch (err) {
+      console.error(err);
+      if (statusEl) statusEl.textContent = 'Sorry, we had trouble reading that PDF.';
+    }
+  }
+
+  async function ingestUploadedPdf(file) {
+    const url = URL.createObjectURL(file);
+    const pdf = await window.pdfjsLib.getDocument(url).promise;
+    const page = await pdf.getPage(1);
+    const textContent = await page.getTextContent();
+    const items = textContent.items.filter((it) => it.str && it.str.trim());
+
+    const extracted = extractInvoiceFields(items);
+
+    const numberLabel = extracted.autopop['rs-inv-number']?.value || file.name.replace(/\.pdf$/i, '');
+    const amountVal = extracted.autopop['rs-amount']?.value;
+    const formattedAmount = amountVal
+      ? `$${Number(amountVal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : '—';
+    const isoInvDate = extracted.autopop['rs-inv-date']?.value;
+
+    return {
+      id: `upload-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      vendor: extracted.vendor || file.name.replace(/\.pdf$/i, ''),
+      number: numberLabel,
+      amount: formattedAmount,
+      date: isoInvDate ? formatDisplayDate(isoInvDate) : new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+      status: 'new',
+      cta: 'Review & Save',
+      pdf: url,
+      autopopulate: extracted.autopop,
+      uploaded: true,
+    };
+  }
+
+  function formatDisplayDate(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  // ===== Heuristic invoice extractor =====
+  function extractInvoiceFields(items) {
+    const autopop = {};
+
+    // Invoice Number
+    const invNum = findValueNearLabel(items, /^invoice\s*(#|no\.?|number)?\s*:?$/i, /[A-Za-z0-9][A-Za-z0-9-]{2,}/);
+    if (invNum) {
+      autopop['rs-inv-number'] = { value: invNum.str.trim(), search: invNum.str };
+    } else {
+      const fullText = items.map((it) => it.str).join(' ');
+      const m = fullText.match(/\b(INV[-\s]?[A-Z0-9]{2,12})\b/i);
+      if (m) autopop['rs-inv-number'] = { value: m[1].trim(), search: m[1] };
+    }
+
+    // Invoice Date
+    const invDate = findValueNearLabel(
+      items,
+      /^(?:invoice\s*date|bill\s*date|date(?:\s*issued)?)\s*:?$/i,
+      DATE_REGEX,
+    );
+    if (invDate) {
+      const iso = parseDateToIso(invDate.str);
+      if (iso) autopop['rs-inv-date'] = { value: iso, search: invDate.str };
+    }
+
+    // Due Date
+    const dueDate = findValueNearLabel(
+      items,
+      /^(?:due\s*date|payment\s*due|date\s*due)\s*:?$/i,
+      DATE_REGEX,
+    );
+    if (dueDate) {
+      const iso = parseDateToIso(dueDate.str);
+      if (iso) autopop['rs-due-date'] = { value: iso, search: dueDate.str };
+    }
+
+    // Amount — prefer "Total Due / Balance Due / Amount Due"; fall back to "Total"
+    let total = findValueNearLabel(
+      items,
+      /^(?:total\s*due|balance\s*due|amount\s*due|grand\s*total)\s*:?$/i,
+      AMOUNT_REGEX,
+    );
+    if (!total) {
+      total = findValueNearLabel(items, /^total\s*:?$/i, AMOUNT_REGEX);
+    }
+    if (total) {
+      const numeric = total.str.replace(/[^\d.]/g, '');
+      autopop['rs-amount'] = { value: numeric, search: total.str, occurrence: 'last' };
+    }
+
+    // Vendor (best-effort): biggest text near the top that isn't a header word
+    const vendor = guessVendor(items);
+
+    return { autopop, vendor };
+  }
+
+  const DATE_REGEX = /(?:\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{4}-\d{2}-\d{2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z.]*\s+\d{1,2},?\s+\d{4})/i;
+  const AMOUNT_REGEX = /^\$?\s*[\d,]+\.\d{2}\s*$/;
+
+  function findValueNearLabel(items, labelRegex, valueRegex) {
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const trimmed = it.str.trim().replace(/[: ]/g, '').trim();
+      if (!labelRegex.test(trimmed) && !labelRegex.test(it.str.trim())) continue;
+
+      const labelY = it.transform[5];
+      const labelX = it.transform[4];
+      const labelW = it.width || 0;
+      const labelEnd = labelX + labelW;
+
+      // 1) Same row, to the right
+      const sameRow = items
+        .map((c, j) => ({ c, j }))
+        .filter(({ c, j }) => j !== i
+          && Math.abs(c.transform[5] - labelY) < 4
+          && c.transform[4] >= labelEnd - 2)
+        .sort((a, b) => a.c.transform[4] - b.c.transform[4]);
+      const sameRowMatch = pickByRegex(sameRow.map((x) => x.c), valueRegex);
+      if (sameRowMatch) return sameRowMatch;
+
+      // 2) Immediately below label, similar x
+      const below = items
+        .map((c, j) => ({ c, j }))
+        .filter(({ c, j }) => j !== i
+          && c.transform[5] < labelY
+          && labelY - c.transform[5] < 28
+          && Math.abs(c.transform[4] - labelX) < 60)
+        .sort((a, b) => (labelY - a.c.transform[5]) - (labelY - b.c.transform[5]));
+      const belowMatch = pickByRegex(below.map((x) => x.c), valueRegex);
+      if (belowMatch) return belowMatch;
+    }
+    return null;
+  }
+
+  function pickByRegex(candidates, regex) {
+    for (const c of candidates) {
+      const s = c.str.trim();
+      if (!s) continue;
+      if (!regex || regex.test(s)) return c;
+    }
+    return null;
+  }
+
+  function parseDateToIso(str) {
+    if (!str) return null;
+    const cleaned = str.replace(/[,]/g, ' ').replace(/\s+/g, ' ').trim();
+    const d = new Date(cleaned);
+    if (isNaN(d.getTime())) return null;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function guessVendor(items) {
+    // Look at items in the top quarter of the page; pick the longest non-header string with a tall font.
+    if (!items.length) return null;
+    const ys = items.map((it) => it.transform[5]);
+    const maxY = Math.max(...ys);
+    const minY = Math.min(...ys);
+    const cutoff = maxY - (maxY - minY) * 0.2;
+    const headers = /^(invoice|bill|receipt|statement|tax invoice|page \d+)$/i;
+    const candidates = items
+      .filter((it) => it.transform[5] >= cutoff
+        && it.str.trim().length >= 4
+        && !headers.test(it.str.trim())
+        && !/^\d/.test(it.str.trim())
+        && !/@/.test(it.str));
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => (b.height || 0) - (a.height || 0) || b.str.length - a.str.length);
+    return candidates[0].str.trim();
   }
 
   function invoiceCard(inv) {
