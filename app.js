@@ -745,12 +745,25 @@
     wrap.appendChild(textLayer);
 
     if (typeof pdfjs.renderTextLayer === 'function') {
-      pdfjs.renderTextLayer({
-        textContentSource: textContent,
-        container: textLayer,
-        viewport,
-        textDivs: [],
-      });
+      const renderArgs = { container: textLayer, viewport, textDivs: [] };
+      // v3 uses `textContent`; v4+ uses `textContentSource`.
+      renderArgs.textContent = textContent;
+      renderArgs.textContentSource = textContent;
+      try {
+        pdfjs.renderTextLayer(renderArgs);
+      } catch (e) {
+        console.warn('renderTextLayer failed; falling back to manual spans', e);
+        textContent.items.forEach((item) => {
+          if (!item.str) return;
+          const tx = pdfjs.Util.transform(viewport.transform, item.transform);
+          const span = document.createElement('span');
+          span.textContent = item.str;
+          span.style.left = tx[4] + 'px';
+          span.style.top = (tx[5] - Math.hypot(tx[2], tx[3])) + 'px';
+          span.style.fontSize = Math.hypot(tx[2], tx[3]) + 'px';
+          textLayer.appendChild(span);
+        });
+      }
     }
 
     // Place hotspots over the auto-populated values

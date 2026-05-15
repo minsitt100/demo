@@ -701,6 +701,7 @@ button { font-family: inherit; cursor: pointer; }
   position: absolute;
   inset: 0;
   pointer-events: none;
+  z-index: 3;
 }
 .pdf-text-layer {
   position: absolute;
@@ -708,6 +709,8 @@ button { font-family: inherit; cursor: pointer; }
   overflow: hidden;
   opacity: 0.0001; /* invisible but selectable for copy/paste */
   line-height: 1;
+  z-index: 2;
+  pointer-events: none;
 }
 .pdf-text-layer span {
   position: absolute;
@@ -715,6 +718,7 @@ button { font-family: inherit; cursor: pointer; }
   cursor: text;
   transform-origin: 0% 0%;
   color: transparent;
+  pointer-events: auto;
 }
 .pdf-text-layer ::selection { background: rgba(27, 127, 158, 0.35); }
 
