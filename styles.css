@@ -626,12 +626,113 @@ button { font-family: inherit; cursor: pointer; }
   flex: 1;
   background: var(--bg-secondary);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   color: var(--text-secondary);
   padding: 24px;
   overflow: auto;
 }
+.pdf-canvas-wrap {
+  position: relative;
+  background: var(--bg);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 720px;
+}
+.pdf-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.pdf-loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.pdf-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0.0001; /* invisible but selectable for copy/paste */
+  line-height: 1;
+}
+.pdf-text-layer span {
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  color: transparent;
+}
+.pdf-text-layer ::selection { background: rgba(27, 127, 158, 0.35); }
+
+.pdf-hotspot {
+  position: absolute;
+  border: 1.5px solid var(--secondary);
+  border-radius: 4px;
+  background: rgba(27, 127, 158, 0.06);
+  pointer-events: auto;
+  cursor: help;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.pdf-hotspot:hover {
+  background: rgba(27, 127, 158, 0.18);
+  box-shadow: 0 0 0 2px rgba(27, 127, 158, 0.25);
+}
+
+.arrow-svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.arrow-svg.visible { opacity: 1; }
+
+.review-layout { position: relative; }
+
+.form-input.autopop,
+.form-select.autopop {
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 2px rgba(27, 127, 158, 0.12);
+}
+
+.autopop-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--info-bg);
+  border-left: 4px solid var(--info);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 20px;
+  color: var(--info-text);
+  font-size: 13px;
+}
+.autopop-banner svg:first-child {
+  color: var(--info);
+  flex-shrink: 0;
+}
+.autopop-banner span { flex: 1; }
+.autopop-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+.autopop-dismiss:hover { background: rgba(0, 0, 0, 0.06); color: var(--text); }
+.autopop-banner--hidden { display: none; }
 .pdf-placeholder {
   background: var(--bg);
   border: 1px dashed var(--border);
