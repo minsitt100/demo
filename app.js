@@ -545,7 +545,7 @@
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4L19 6"/></svg>
                 <div class="autopop-banner-text">
                   <div>We've automatically filled some details for you!</div>
-                  <div class="autopop-banner-hint">Tip: select any text in the invoice and right-click to send it to a field.</div>
+                  <div class="autopop-banner-hint">Tip: right-click any value in the invoice to send it to a field.</div>
                 </div>
                 <button type="button" class="autopop-dismiss" aria-label="Dismiss">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -671,13 +671,21 @@
       navigate('inbox');
     });
 
-    // Right-click on selected PDF text → "Send to field" menu
+    // Right-click anywhere on a PDF value (or drag-selection) → "Send to field" menu
     const pdfBodyEl = document.getElementById('pdf-body');
     if (pdfBodyEl) {
       pdfBodyEl.addEventListener('contextmenu', (e) => {
+        let text = '';
         const sel = window.getSelection();
-        const text = sel ? sel.toString().trim() : '';
-        if (!text) return; // nothing selected → default browser menu
+        if (sel && sel.toString().trim()) {
+          text = sel.toString().trim();
+        } else {
+          // Fall back to the text span directly under the cursor
+          const els = document.elementsFromPoint(e.clientX, e.clientY);
+          const span = els.find((el) => el && el.dataset && el.dataset.pdfText);
+          if (span) text = span.dataset.pdfText.trim();
+        }
+        if (!text) return; // nothing useful → default browser menu
         e.preventDefault();
         openSendToMenu(e.clientX, e.clientY, text);
       });
@@ -752,28 +760,20 @@
 
     await page.render({ canvasContext: ctx, viewport }).promise;
 
-    // Build the text layer (selectable text for copy/paste).
+    // Build the text layer manually so spans are reliable + interactive.
     const textContent = await page.getTextContent();
-    if (typeof pdfjs.renderTextLayer === 'function') {
-      const renderArgs = { container: textLayer, viewport, textDivs: [] };
-      renderArgs.textContent = textContent;
-      renderArgs.textContentSource = textContent;
-      try {
-        pdfjs.renderTextLayer(renderArgs);
-      } catch (e) {
-        console.warn('renderTextLayer failed; falling back to manual spans', e);
-        textContent.items.forEach((item) => {
-          if (!item.str) return;
-          const tx = pdfjs.Util.transform(viewport.transform, item.transform);
-          const span = document.createElement('span');
-          span.textContent = item.str;
-          span.style.left = tx[4] + 'px';
-          span.style.top = (tx[5] - Math.hypot(tx[2], tx[3])) + 'px';
-          span.style.fontSize = Math.hypot(tx[2], tx[3]) + 'px';
-          textLayer.appendChild(span);
-        });
-      }
-    }
+    textContent.items.forEach((item) => {
+      if (!item.str) return;
+      const tx = pdfjs.Util.transform(viewport.transform, item.transform);
+      const fontHeight = Math.hypot(tx[2], tx[3]);
+      const span = document.createElement('span');
+      span.textContent = item.str;
+      span.dataset.pdfText = item.str;
+      span.style.left = tx[4] + 'px';
+      span.style.top = (tx[5] - fontHeight) + 'px';
+      span.style.fontSize = fontHeight + 'px';
+      textLayer.appendChild(span);
+    });
 
     // Hotspot positions are expressed as percentages of the viewport so they
     // stay aligned with the canvas at any rendered size.
