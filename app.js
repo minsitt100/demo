@@ -6,7 +6,22 @@
   toggleBtn.addEventListener('click', () => layout.classList.toggle('nav-collapsed'));
 
   const invoices = [
-    { id: 'inv-1', vendor: 'Acme Supplies Co.', number: 'INV-2041', amount: '$1,248.50', date: 'May 8, 2026', status: 'new', cta: 'Review & Save' },
+    {
+      id: 'inv-1',
+      vendor: 'Acme Supplies Co.',
+      number: 'INV-2041',
+      amount: '$1,248.50',
+      date: 'May 8, 2026',
+      status: 'new',
+      cta: 'Review & Save',
+      pdf: 'invoice-2041.pdf',
+      autopopulate: {
+        'rs-inv-number': { value: 'INV-2041', search: 'INV-2041' },
+        'rs-inv-date': { value: '2026-05-08', search: 'May 8, 2026' },
+        'rs-due-date': { value: '2026-06-07', search: 'Jun 7, 2026' },
+        'rs-amount': { value: '1248.50', search: '$1,248.50', occurrence: 'last' },
+      },
+    },
     { id: 'inv-2', vendor: 'Northwind Logistics', number: 'INV-7732', amount: '$612.00', date: 'May 6, 2026', status: 'new', cta: 'Review & Save' },
     { id: 'inv-3', vendor: 'Globex Software', number: 'INV-1188', amount: '$3,400.00', date: 'May 4, 2026', status: 'review', cta: 'Enter Bill' },
     { id: 'inv-4', vendor: 'Initech Cloud', number: 'INV-0099', amount: '$89.99', date: 'May 1, 2026', status: 'new', cta: 'Review & Save' },
@@ -286,56 +301,67 @@
   // ===== Review & Save split view =====
   function renderReviewSave(inv) {
     inv = inv || invoices[0];
+    const hasAutopop = !!inv.autopopulate;
     content.innerHTML = `
       <div class="page-header">
         <h1 class="page-title">Review & Save</h1>
         <button class="btn btn-ghost" data-action="back">← Back to Inbox</button>
       </div>
-      <div class="review-layout">
+      <div class="review-layout" id="review-layout">
+        <svg class="arrow-svg" id="arrow-svg" aria-hidden="true"></svg>
         <div class="review-pdf">
           <div class="review-pdf-header">
             <span>${inv.number} — ${inv.vendor}</span>
             <span style="color:var(--text-secondary);font-size:12px;">PDF preview</span>
           </div>
-          <div class="review-pdf-body">
-            <div class="pdf-placeholder">
-              <div class="pdf-line short"></div>
-              <div class="pdf-line medium"></div>
-              <div class="pdf-spacer"></div>
-              <div class="pdf-line"></div>
-              <div class="pdf-line"></div>
-              <div class="pdf-line medium"></div>
-              <div class="pdf-spacer"></div>
-              <div class="pdf-line short"></div>
-              <div class="pdf-line"></div>
-              <div class="pdf-line medium"></div>
-              <div class="pdf-caption">Invoice PDF will render here</div>
-            </div>
+          <div class="review-pdf-body" id="pdf-body">
+            ${inv.pdf
+              ? `<div class="pdf-canvas-wrap" id="pdf-canvas-wrap">
+                   <div class="pdf-loading">Loading invoice…</div>
+                 </div>`
+              : `<div class="pdf-placeholder">
+                   <div class="pdf-line short"></div>
+                   <div class="pdf-line medium"></div>
+                   <div class="pdf-spacer"></div>
+                   <div class="pdf-line"></div>
+                   <div class="pdf-line"></div>
+                   <div class="pdf-line medium"></div>
+                   <div class="pdf-caption">Invoice PDF will render here</div>
+                 </div>`}
           </div>
         </div>
 
         <form class="review-form" id="review-form">
           <div class="review-form-inner">
+            ${hasAutopop ? `
+              <div class="autopop-banner" id="autopop-banner" role="status">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4L19 6"/></svg>
+                <span>We've automatically filled some details for you!</span>
+                <button type="button" class="autopop-dismiss" aria-label="Dismiss">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            ` : ''}
             <div class="form-row cols-1">
               <div class="form-field">
-                <label class="form-label">Vendor Name</label>
-                <input class="form-input" type="text" value="${inv.vendor}" />
+                <label class="form-label" for="rs-vendor">Vendor Name</label>
+                <input id="rs-vendor" class="form-input" type="text" value="${inv.vendor}" />
               </div>
             </div>
             <div class="form-row cols-2">
               <div class="form-field">
-                <label class="form-label">Invoice Number</label>
-                <input class="form-input" type="text" value="${inv.number}" />
+                <label class="form-label" for="rs-inv-number">Invoice Number</label>
+                <input id="rs-inv-number" class="form-input" type="text" placeholder="INV-0000" />
               </div>
               <div class="form-field">
-                <label class="form-label">PO Number</label>
-                <input class="form-input" type="text" placeholder="PO-0000" />
+                <label class="form-label" for="rs-po-number">PO Number</label>
+                <input id="rs-po-number" class="form-input" type="text" placeholder="PO-0000" />
               </div>
             </div>
             <div class="form-row cols-4">
               <div class="form-field">
-                <label class="form-label">Payment Term</label>
-                <select class="form-select">
+                <label class="form-label" for="rs-payment-term">Payment Term</label>
+                <select id="rs-payment-term" class="form-select">
                   <option>Net 30</option>
                   <option>Net 15</option>
                   <option>Net 60</option>
@@ -343,26 +369,26 @@
                 </select>
               </div>
               <div class="form-field">
-                <label class="form-label">Invoice Date</label>
-                <input class="form-input" type="date" />
+                <label class="form-label" for="rs-inv-date">Invoice Date</label>
+                <input id="rs-inv-date" class="form-input" type="date" />
               </div>
               <div class="form-field">
-                <label class="form-label">GL Posting Date</label>
-                <input class="form-input" type="date" />
+                <label class="form-label" for="rs-gl-date">GL Posting Date</label>
+                <input id="rs-gl-date" class="form-input" type="date" />
               </div>
               <div class="form-field">
-                <label class="form-label">Due Date</label>
-                <input class="form-input" type="date" />
+                <label class="form-label" for="rs-due-date">Due Date</label>
+                <input id="rs-due-date" class="form-input" type="date" />
               </div>
             </div>
             <div class="form-row cols-2">
               <div class="form-field">
-                <label class="form-label">Amount</label>
-                <input class="form-input" type="number" id="amount-input" step="0.01" placeholder="0.00" />
+                <label class="form-label" for="rs-amount">Amount</label>
+                <input id="rs-amount" class="form-input" type="number" step="0.01" placeholder="0.00" />
               </div>
               <div class="form-field">
-                <label class="form-label">Bill Description</label>
-                <input class="form-input" type="text" placeholder="Description" />
+                <label class="form-label" for="rs-bill-desc">Bill Description</label>
+                <input id="rs-bill-desc" class="form-input" type="text" placeholder="Description" />
               </div>
             </div>
 
@@ -409,7 +435,7 @@
     `;
 
     // Update expense title from Amount input
-    const amountInput = content.querySelector('#amount-input');
+    const amountInput = content.querySelector('#rs-amount');
     const expenseTitle = content.querySelector('#expense-title');
     amountInput.addEventListener('input', () => {
       const v = parseFloat(amountInput.value) || 0;
@@ -434,6 +460,165 @@
       alert('Bill saved (placeholder).');
       navigate('inbox');
     });
+
+    // Auto-populate form fields and flag them as autopop
+    if (inv.autopopulate) {
+      Object.entries(inv.autopopulate).forEach(([fieldId, info]) => {
+        const el = document.getElementById(fieldId);
+        if (el) {
+          el.value = info.value;
+          el.classList.add('autopop');
+        }
+      });
+      // trigger amount-driven expense title
+      amountInput.dispatchEvent(new Event('input'));
+
+      const dismissBtn = content.querySelector('.autopop-dismiss');
+      if (dismissBtn) {
+        dismissBtn.addEventListener('click', () => {
+          const banner = content.querySelector('#autopop-banner');
+          if (banner) banner.classList.add('autopop-banner--hidden');
+        });
+      }
+    }
+
+    // Render PDF + hotspots if a PDF is attached
+    if (inv.pdf && typeof window.pdfjsLib !== 'undefined') {
+      renderInvoicePdf(inv).catch((err) => console.error('PDF render failed', err));
+    }
+  }
+
+  async function renderInvoicePdf(inv) {
+    const pdfjs = window.pdfjsLib;
+    pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+    const wrap = document.getElementById('pdf-canvas-wrap');
+    if (!wrap) return;
+
+    const pdf = await pdfjs.getDocument(inv.pdf).promise;
+    const page = await pdf.getPage(1);
+
+    const baseViewport = page.getViewport({ scale: 1 });
+    const containerWidth = wrap.clientWidth - 32; // padding allowance
+    const scale = Math.max(0.5, Math.min(2.5, containerWidth / baseViewport.width));
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement('canvas');
+    canvas.className = 'pdf-canvas';
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'pdf-overlay';
+    overlay.style.width = viewport.width + 'px';
+    overlay.style.height = viewport.height + 'px';
+
+    wrap.innerHTML = '';
+    wrap.appendChild(canvas);
+    wrap.appendChild(overlay);
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    // Build a text layer so users can select / copy text from the PDF
+    const textContent = await page.getTextContent();
+    const textLayer = document.createElement('div');
+    textLayer.className = 'pdf-text-layer';
+    textLayer.style.width = viewport.width + 'px';
+    textLayer.style.height = viewport.height + 'px';
+    wrap.appendChild(textLayer);
+
+    if (typeof pdfjs.renderTextLayer === 'function') {
+      pdfjs.renderTextLayer({
+        textContentSource: textContent,
+        container: textLayer,
+        viewport,
+        textDivs: [],
+      });
+    }
+
+    // Place hotspots over the auto-populated values
+    const autopop = inv.autopopulate || {};
+    Object.entries(autopop).forEach(([fieldId, info]) => {
+      const matches = textContent.items.filter((it) => it.str === info.search);
+      if (!matches.length) return;
+      const item = info.occurrence === 'last' ? matches[matches.length - 1] : matches[0];
+
+      const tx = pdfjs.Util.transform(viewport.transform, item.transform);
+      const fontHeight = Math.hypot(tx[2], tx[3]);
+      const textWidth = item.width * scale;
+      const left = tx[4];
+      const top = tx[5] - fontHeight;
+
+      const hotspot = document.createElement('div');
+      hotspot.className = 'pdf-hotspot';
+      hotspot.style.left = (left - 4) + 'px';
+      hotspot.style.top = (top - 2) + 'px';
+      hotspot.style.width = (textWidth + 8) + 'px';
+      hotspot.style.height = (fontHeight + 4) + 'px';
+      hotspot.dataset.target = fieldId;
+      hotspot.title = info.search;
+      overlay.appendChild(hotspot);
+
+      hotspot.addEventListener('mouseenter', () => drawArrow(hotspot, fieldId));
+      hotspot.addEventListener('mouseleave', () => clearArrow());
+    });
+
+    // Redraw arrow on scroll inside either panel
+    const reviewForm = document.getElementById('review-form');
+    const pdfBody = document.getElementById('pdf-body');
+    [reviewForm, pdfBody, window].forEach((target) => {
+      target.addEventListener('scroll', () => {
+        const hoveredId = currentArrowFieldId;
+        if (hoveredId) {
+          const hs = overlay.querySelector(`.pdf-hotspot[data-target="${hoveredId}"]`);
+          if (hs) drawArrow(hs, hoveredId);
+        }
+      }, true);
+    });
+  }
+
+  let currentArrowFieldId = null;
+  function drawArrow(fromEl, toId) {
+    const toEl = document.getElementById(toId);
+    const svg = document.getElementById('arrow-svg');
+    const layout = document.getElementById('review-layout');
+    if (!toEl || !svg || !layout) return;
+    currentArrowFieldId = toId;
+
+    const layoutRect = layout.getBoundingClientRect();
+    svg.setAttribute('width', layoutRect.width);
+    svg.setAttribute('height', layoutRect.height);
+    svg.setAttribute('viewBox', `0 0 ${layoutRect.width} ${layoutRect.height}`);
+
+    const fromRect = fromEl.getBoundingClientRect();
+    const toRect = toEl.getBoundingClientRect();
+
+    const fromX = fromRect.right - layoutRect.left;
+    const fromY = (fromRect.top + fromRect.bottom) / 2 - layoutRect.top;
+    const toX = toRect.left - layoutRect.left;
+    const toY = (toRect.top + toRect.bottom) / 2 - layoutRect.top;
+
+    // Curved path for a softer look
+    const midX = (fromX + toX) / 2;
+    const c1 = `${midX},${fromY}`;
+    const c2 = `${midX},${toY}`;
+
+    svg.innerHTML = `
+      <path d="M ${fromX} ${fromY} C ${c1} ${c2} ${toX} ${toY}"
+            fill="none" stroke="var(--secondary)" stroke-width="2" stroke-dasharray="5 4" />
+      <circle cx="${fromX}" cy="${fromY}" r="3" fill="var(--secondary)" />
+      <circle cx="${toX}" cy="${toY}" r="7" fill="var(--bg)" stroke="var(--secondary)" stroke-width="2" />
+      <circle cx="${toX}" cy="${toY}" r="2.5" fill="var(--secondary)" />
+    `;
+    svg.classList.add('visible');
+  }
+  function clearArrow() {
+    currentArrowFieldId = null;
+    const svg = document.getElementById('arrow-svg');
+    if (!svg) return;
+    svg.innerHTML = '';
+    svg.classList.remove('visible');
   }
 
   // ===== Placeholder =====
