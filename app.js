@@ -953,14 +953,9 @@
     const toX = toRect.left - layoutRect.left;
     const toY = (toRect.top + toRect.bottom) / 2 - layoutRect.top;
 
-    // Curved path for a softer look
-    const midX = (fromX + toX) / 2;
-    const c1 = `${midX},${fromY}`;
-    const c2 = `${midX},${toY}`;
-
     svg.innerHTML = `
-      <path d="M ${fromX} ${fromY} C ${c1} ${c2} ${toX} ${toY}"
-            fill="none" stroke="var(--secondary)" stroke-width="2" stroke-dasharray="5 4" />
+      <line x1="${fromX}" y1="${fromY}" x2="${toX}" y2="${toY}"
+            stroke="var(--secondary)" stroke-width="2" />
       <circle cx="${fromX}" cy="${fromY}" r="3" fill="var(--secondary)" />
       <circle cx="${toX}" cy="${toY}" r="7" fill="var(--bg)" stroke="var(--secondary)" stroke-width="2" />
       <circle cx="${toX}" cy="${toY}" r="2.5" fill="var(--secondary)" />
