@@ -543,7 +543,10 @@
             ${hasAutopop ? `
               <div class="autopop-banner" id="autopop-banner" role="status">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4L19 6"/></svg>
-                <span>We've automatically filled some details for you!</span>
+                <div class="autopop-banner-text">
+                  <div>We've automatically filled some details for you!</div>
+                  <div class="autopop-banner-hint">Tip: select any text in the invoice and right-click to send it to a field.</div>
+                </div>
                 <button type="button" class="autopop-dismiss" aria-label="Dismiss">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
@@ -667,6 +670,18 @@
       alert('Bill saved (placeholder).');
       navigate('inbox');
     });
+
+    // Right-click on selected PDF text → "Send to field" menu
+    const pdfBodyEl = document.getElementById('pdf-body');
+    if (pdfBodyEl) {
+      pdfBodyEl.addEventListener('contextmenu', (e) => {
+        const sel = window.getSelection();
+        const text = sel ? sel.toString().trim() : '';
+        if (!text) return; // nothing selected → default browser menu
+        e.preventDefault();
+        openSendToMenu(e.clientX, e.clientY, text);
+      });
+    }
 
     // Auto-populate form fields and flag them as autopop
     if (inv.autopopulate) {
@@ -818,6 +833,103 @@
     [reviewForm, pdfBody].forEach((target) => target.addEventListener('scroll', redrawIfHovering, true));
     window.addEventListener('scroll', redrawIfHovering, true);
     window.addEventListener('resize', redrawIfHovering);
+  }
+
+  const FORM_FIELDS = [
+    { id: 'rs-vendor', label: 'Vendor Name' },
+    { id: 'rs-inv-number', label: 'Invoice Number' },
+    { id: 'rs-po-number', label: 'PO Number' },
+    { id: 'rs-payment-term', label: 'Payment Term' },
+    { id: 'rs-inv-date', label: 'Invoice Date' },
+    { id: 'rs-gl-date', label: 'GL Posting Date' },
+    { id: 'rs-due-date', label: 'Due Date' },
+    { id: 'rs-amount', label: 'Amount' },
+    { id: 'rs-bill-desc', label: 'Bill Description' },
+  ];
+
+  function openSendToMenu(x, y, text) {
+    closeSendToMenu();
+    const menu = document.createElement('div');
+    menu.className = 'send-menu';
+    menu.id = 'send-menu';
+    menu.innerHTML = `
+      <div class="send-menu-header">Send <span class="send-menu-text">"${escapeHtml(truncate(text, 40))}"</span> to:</div>
+      ${FORM_FIELDS.map((f) => `<button type="button" class="send-menu-item" data-field="${f.id}">${f.label}</button>`).join('')}
+    `;
+    document.body.appendChild(menu);
+
+    // Position; clamp to viewport.
+    const rect = menu.getBoundingClientRect();
+    const left = Math.min(x, window.innerWidth - rect.width - 8);
+    const top = Math.min(y, window.innerHeight - rect.height - 8);
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+
+    menu.querySelectorAll('.send-menu-item').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        sendToField(btn.dataset.field, text);
+        closeSendToMenu();
+      });
+    });
+
+    // Dismiss on outside click / escape / scroll
+    setTimeout(() => {
+      document.addEventListener('mousedown', onOutsideClick);
+      document.addEventListener('keydown', onMenuKey);
+      window.addEventListener('scroll', closeSendToMenu, true);
+    }, 0);
+  }
+  function onOutsideClick(e) {
+    const menu = document.getElementById('send-menu');
+    if (menu && !menu.contains(e.target)) closeSendToMenu();
+  }
+  function onMenuKey(e) {
+    if (e.key === 'Escape') closeSendToMenu();
+  }
+  function closeSendToMenu() {
+    const menu = document.getElementById('send-menu');
+    if (menu) menu.remove();
+    document.removeEventListener('mousedown', onOutsideClick);
+    document.removeEventListener('keydown', onMenuKey);
+    window.removeEventListener('scroll', closeSendToMenu, true);
+  }
+
+  function sendToField(fieldId, raw) {
+    const el = document.getElementById(fieldId);
+    if (!el) return;
+    const text = raw.trim();
+
+    if (el.tagName === 'SELECT') {
+      // Try to match an option by text
+      const lower = text.toLowerCase();
+      const match = Array.from(el.options).find((o) => o.text.toLowerCase() === lower);
+      if (match) el.value = match.value;
+    } else if (el.type === 'date') {
+      const iso = parseDateToIso(text);
+      el.value = iso || text;
+    } else if (el.type === 'number') {
+      const cleaned = text.replace(/[^\d.\-]/g, '');
+      el.value = cleaned;
+    } else {
+      el.value = text;
+    }
+
+    el.classList.add('autopop', 'field-flash');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    setTimeout(() => el.classList.remove('field-flash'), 700);
+    el.focus({ preventScroll: false });
+  }
+
+  function truncate(s, max) {
+    if (!s) return '';
+    return s.length > max ? s.slice(0, max - 1) + '…' : s;
+  }
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   let currentArrowFieldId = null;
