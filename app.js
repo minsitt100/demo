@@ -22,11 +22,6 @@
         'rs-amount': { value: '1248.50', search: '$1,248.50', occurrence: 'last' },
       },
     },
-    { id: 'inv-2', vendor: 'Northwind Logistics', number: 'INV-7732', amount: '$612.00', date: 'May 6, 2026', status: 'new', cta: 'Review & Save' },
-    { id: 'inv-3', vendor: 'Globex Software', number: 'INV-1188', amount: '$3,400.00', date: 'May 4, 2026', status: 'review', cta: 'Enter Bill' },
-    { id: 'inv-4', vendor: 'Initech Cloud', number: 'INV-0099', amount: '$89.99', date: 'May 1, 2026', status: 'new', cta: 'Review & Save' },
-    { id: 'inv-5', vendor: 'Hooli Hosting', number: 'INV-5520', amount: '$215.75', date: 'Apr 29, 2026', status: 'review', cta: 'Enter Bill' },
-    { id: 'inv-6', vendor: 'Stark Industries', number: 'INV-3301', amount: '$12,800.00', date: 'Apr 28, 2026', status: 'new', cta: 'Review & Save' },
   ];
 
   const routes = {
