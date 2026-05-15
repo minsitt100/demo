@@ -259,17 +259,18 @@
   function renderInbox() {
     content.innerHTML = `
       <div class="page-header">
-        <h1 class="page-title">Inbox</h1>
-        <div class="page-subtitle" style="color:var(--text-secondary);font-size:13px;">${invoices.length} invoices from your vendors</div>
-      </div>
-      <div class="upload-zone" id="upload-zone">
-        <input type="file" id="upload-input" accept="application/pdf" multiple hidden />
-        <div class="upload-icon">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <div>
+          <h1 class="page-title">Inbox</h1>
+          <div class="page-subtitle" style="color:var(--text-secondary);font-size:13px;">${invoices.length} invoices from your vendors</div>
         </div>
-        <div class="upload-text">Drop PDF invoices here or <span class="upload-link">browse files</span></div>
-        <div class="upload-hint">We'll pull out the key invoice details for you.</div>
-        <div class="upload-status" id="upload-status"></div>
+        <div class="page-header-actions">
+          <span class="upload-status" id="upload-status"></span>
+          <input type="file" id="upload-input" accept="application/pdf" multiple hidden />
+          <button class="btn" id="upload-btn" type="button">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload Invoice
+          </button>
+        </div>
       </div>
       <div class="inbox-grid">
         ${invoices.map(invoiceCard).join('')}
@@ -289,22 +290,12 @@
       });
     });
 
-    const zone = document.getElementById('upload-zone');
+    const uploadBtn = document.getElementById('upload-btn');
     const input = document.getElementById('upload-input');
     const status = document.getElementById('upload-status');
 
-    zone.addEventListener('click', (e) => {
-      if (e.target.tagName === 'INPUT') return;
-      input.click();
-    });
+    uploadBtn.addEventListener('click', () => input.click());
     input.addEventListener('change', (e) => handleUploads(e.target.files, status));
-    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
-    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-    zone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      zone.classList.remove('drag-over');
-      handleUploads(e.dataTransfer.files, status);
-    });
   }
 
   async function handleUploads(fileList, statusEl) {
