@@ -748,6 +748,54 @@ button { font-family: inherit; cursor: pointer; }
 }
 .autopop-dismiss:hover { background: rgba(0, 0, 0, 0.06); color: var(--text); }
 .autopop-banner--hidden { display: none; }
+.autopop-banner-text { flex: 1; line-height: 1.4; }
+.autopop-banner-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* Right-click "send to field" menu */
+.send-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 6px;
+  min-width: 220px;
+  font-size: 13px;
+}
+.send-menu-header {
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.send-menu-text { color: var(--secondary); font-weight: 600; }
+.send-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.send-menu-item:hover { background: var(--bg-secondary); color: var(--secondary); }
+
+@keyframes field-flash {
+  0% { box-shadow: 0 0 0 0 rgba(27, 127, 158, 0.5); }
+  100% { box-shadow: 0 0 0 8px rgba(27, 127, 158, 0); }
+}
+.field-flash { animation: field-flash 0.7s ease-out; }
 .pdf-placeholder {
   background: var(--bg);
   border: 1px dashed var(--border);
