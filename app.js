@@ -705,10 +705,10 @@
     const pdf = await pdfjs.getDocument(inv.pdf).promise;
     const page = await pdf.getPage(1);
 
+    // Render canvas at a high fixed scale (for crisp text); CSS will downscale to fit container.
     const baseViewport = page.getViewport({ scale: 1 });
-    const containerWidth = wrap.clientWidth - 32; // padding allowance
-    const scale = Math.max(0.5, Math.min(2.5, containerWidth / baseViewport.width));
-    const viewport = page.getViewport({ scale });
+    const renderScale = Math.min(2 * (window.devicePixelRatio || 1), 4);
+    const viewport = page.getViewport({ scale: renderScale });
 
     const canvas = document.createElement('canvas');
     canvas.className = 'pdf-canvas';
@@ -716,28 +716,31 @@
     canvas.height = viewport.height;
     const ctx = canvas.getContext('2d');
 
+    // Overlay covers the canvas exactly (via CSS inset:0 + aspect ratio on the wrap).
     const overlay = document.createElement('div');
     overlay.className = 'pdf-overlay';
-    overlay.style.width = viewport.width + 'px';
-    overlay.style.height = viewport.height + 'px';
 
-    wrap.innerHTML = '';
-    wrap.appendChild(canvas);
-    wrap.appendChild(overlay);
-
-    await page.render({ canvasContext: ctx, viewport }).promise;
-
-    // Build a text layer so users can select / copy text from the PDF
-    const textContent = await page.getTextContent();
+    // Text layer is sized at viewport pixels and CSS-transform-scaled to fit.
     const textLayer = document.createElement('div');
     textLayer.className = 'pdf-text-layer';
     textLayer.style.width = viewport.width + 'px';
     textLayer.style.height = viewport.height + 'px';
-    wrap.appendChild(textLayer);
 
+    // Lock the wrap's aspect ratio to the page's aspect ratio so the overlay
+    // covers exactly the same area as the canvas at any container width.
+    wrap.style.aspectRatio = `${baseViewport.width} / ${baseViewport.height}`;
+
+    wrap.innerHTML = '';
+    wrap.appendChild(canvas);
+    wrap.appendChild(textLayer);
+    wrap.appendChild(overlay); // overlay last → on top of the text layer
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    // Build the text layer (selectable text for copy/paste).
+    const textContent = await page.getTextContent();
     if (typeof pdfjs.renderTextLayer === 'function') {
       const renderArgs = { container: textLayer, viewport, textDivs: [] };
-      // v3 uses `textContent`; v4+ uses `textContentSource`.
       renderArgs.textContent = textContent;
       renderArgs.textContentSource = textContent;
       try {
@@ -757,7 +760,8 @@
       }
     }
 
-    // Place hotspots over the auto-populated values
+    // Hotspot positions are expressed as percentages of the viewport so they
+    // stay aligned with the canvas at any rendered size.
     const autopop = inv.autopopulate || {};
     Object.entries(autopop).forEach(([fieldId, info]) => {
       const matches = textContent.items.filter((it) => it.str === info.search);
@@ -766,16 +770,21 @@
 
       const tx = pdfjs.Util.transform(viewport.transform, item.transform);
       const fontHeight = Math.hypot(tx[2], tx[3]);
-      const textWidth = item.width * scale;
-      const left = tx[4];
-      const top = tx[5] - fontHeight;
+      const textWidth = item.width * renderScale;
+      const padX = 4 * (renderScale / 1.5);
+      const padY = 3 * (renderScale / 1.5);
+
+      const leftPct = ((tx[4] - padX) / viewport.width) * 100;
+      const topPct = ((tx[5] - fontHeight - padY) / viewport.height) * 100;
+      const widthPct = ((textWidth + 2 * padX) / viewport.width) * 100;
+      const heightPct = ((fontHeight + 2 * padY) / viewport.height) * 100;
 
       const hotspot = document.createElement('div');
       hotspot.className = 'pdf-hotspot';
-      hotspot.style.left = (left - 4) + 'px';
-      hotspot.style.top = (top - 2) + 'px';
-      hotspot.style.width = (textWidth + 8) + 'px';
-      hotspot.style.height = (fontHeight + 4) + 'px';
+      hotspot.style.left = leftPct + '%';
+      hotspot.style.top = topPct + '%';
+      hotspot.style.width = widthPct + '%';
+      hotspot.style.height = heightPct + '%';
       hotspot.dataset.target = fieldId;
       hotspot.title = info.search;
       overlay.appendChild(hotspot);
@@ -784,18 +793,31 @@
       hotspot.addEventListener('mouseleave', () => clearArrow());
     });
 
-    // Redraw arrow on scroll inside either panel
+    // Keep the text layer's scale in sync with the rendered canvas width.
+    function syncTextLayerScale() {
+      const renderedWidth = wrap.clientWidth;
+      if (!renderedWidth) return;
+      const s = renderedWidth / viewport.width;
+      textLayer.style.transformOrigin = '0 0';
+      textLayer.style.transform = `scale(${s})`;
+    }
+    syncTextLayerScale();
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(syncTextLayerScale);
+      ro.observe(wrap);
+    }
+
+    // Redraw arrow on scroll or resize while a hotspot is hovered.
     const reviewForm = document.getElementById('review-form');
     const pdfBody = document.getElementById('pdf-body');
-    [reviewForm, pdfBody, window].forEach((target) => {
-      target.addEventListener('scroll', () => {
-        const hoveredId = currentArrowFieldId;
-        if (hoveredId) {
-          const hs = overlay.querySelector(`.pdf-hotspot[data-target="${hoveredId}"]`);
-          if (hs) drawArrow(hs, hoveredId);
-        }
-      }, true);
-    });
+    const redrawIfHovering = () => {
+      if (!currentArrowFieldId) return;
+      const hs = overlay.querySelector(`.pdf-hotspot[data-target="${currentArrowFieldId}"]`);
+      if (hs) drawArrow(hs, currentArrowFieldId);
+    };
+    [reviewForm, pdfBody].forEach((target) => target.addEventListener('scroll', redrawIfHovering, true));
+    window.addEventListener('scroll', redrawIfHovering, true);
+    window.addEventListener('resize', redrawIfHovering);
   }
 
   let currentArrowFieldId = null;
