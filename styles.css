@@ -161,6 +161,14 @@ button { font-family: inherit; cursor: pointer; }
 }
 .header-action:hover { background: var(--bg-secondary); color: var(--text); }
 
+.header-divider {
+  display: inline-block;
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+  margin: 0 6px;
+}
+
 .avatar {
   width: 34px;
   height: 34px;
