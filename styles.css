@@ -121,10 +121,10 @@ button { font-family: inherit; cursor: pointer; }
   align-items: center;
   background: var(--bg);
   border: 1px solid var(--secondary);
-  border-radius: 8px;
+  border-radius: 3px;
   padding: 0 10px;
-  width: 320px;
-  height: 36px;
+  width: 220px;
+  height: 32px;
   color: var(--text-secondary);
 }
 .search input {
