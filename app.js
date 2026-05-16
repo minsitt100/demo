@@ -172,7 +172,7 @@
           <h2 class="card-title">Payments In</h2>
           ${headerAction(id, index, `<button class="btn" data-action="get-paid">Get Paid</button>`)}
         </div>
-        ${paymentsBlock()}
+        ${paymentsBlock({ todayFirst: true })}
       </section>
     `,
     'payments-out': (id, index) => `
@@ -232,12 +232,16 @@
     });
   }
 
-  function paymentsBlock() {
+  function paymentsBlock({ todayFirst = false } = {}) {
+    const upcomingLabel = `<div class="pay-block-label">Upcoming</div>`;
+    const todayRow = `<div class="pay-row"><span class="pay-row-label">Today</span><button class="amount-link" data-amount-link>$0</button></div>`;
+    const upcomingTop = todayFirst
+      ? `${todayRow}${upcomingLabel}`
+      : `${upcomingLabel}${todayRow}`;
     return `
       <div class="pay-section">
         <div>
-          <div class="pay-block-label">Upcoming</div>
-          <div class="pay-row"><span class="pay-row-label">Today</span><button class="amount-link" data-amount-link>$0</button></div>
+          ${upcomingTop}
           <div class="pay-row"><span class="pay-row-label">Next 7 days</span><button class="amount-link" data-amount-link>$0</button></div>
           <div class="pay-row"><span class="pay-row-label">Next 30 days</span><button class="amount-link" data-amount-link>$0</button></div>
         </div>
