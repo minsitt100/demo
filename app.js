@@ -233,8 +233,8 @@
   }
 
   function paymentsBlock({ todayFirst = false } = {}) {
-    const upcomingLabel = `<div class="pay-block-label">Upcoming</div>`;
-    const todayRow = `<div class="pay-row"><span class="pay-row-label">Today</span><button class="amount-link" data-amount-link>$0</button></div>`;
+    const upcomingLabel = `<div class="pay-block-label">Upcoming Payments</div>`;
+    const todayRow = `<div class="pay-row${todayFirst ? ' pay-row--no-divider' : ''}"><span class="pay-row-label">Today</span><button class="amount-link" data-amount-link>$0</button></div>`;
     const upcomingTop = todayFirst
       ? `${todayRow}${upcomingLabel}`
       : `${upcomingLabel}${todayRow}`;
