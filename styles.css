@@ -555,7 +555,11 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  background: var(--primary);
+  padding: 10px 24px;
+  margin: 12px -24px;
 }
+.pay-row--no-divider { border-bottom: none; padding-bottom: 4px; }
 .pay-row {
   display: flex;
   justify-content: space-between;
