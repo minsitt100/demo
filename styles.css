@@ -119,8 +119,8 @@ button { font-family: inherit; cursor: pointer; }
   position: relative;
   display: flex;
   align-items: center;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--bg);
+  border: 1px solid var(--secondary);
   border-radius: 8px;
   padding: 0 10px;
   width: 320px;
