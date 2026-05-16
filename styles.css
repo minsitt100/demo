@@ -145,6 +145,7 @@ button { font-family: inherit; cursor: pointer; }
   margin-left: 4px;
 }
 .header-action {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -158,6 +159,16 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 11px;
   font-weight: 500;
   line-height: 1.2;
+}
+.header-badge {
+  position: absolute;
+  top: 2px;
+  left: calc(50% + 2px);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--secondary);
+  border: 2px solid var(--bg);
 }
 .header-action:hover { background: var(--bg-secondary); color: var(--text); }
 
