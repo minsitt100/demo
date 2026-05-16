@@ -560,6 +560,7 @@ button { font-family: inherit; cursor: pointer; }
   margin: 12px -24px;
 }
 .pay-row--no-divider { border-bottom: none; padding-bottom: 4px; }
+.pay-row--spaced { padding: 14px 0; }
 .pay-row {
   display: flex;
   justify-content: space-between;

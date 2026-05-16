@@ -234,7 +234,7 @@
 
   function paymentsBlock({ todayFirst = false } = {}) {
     const upcomingLabel = `<div class="pay-block-label">Upcoming Payments</div>`;
-    const todayRow = `<div class="pay-row${todayFirst ? ' pay-row--no-divider' : ''}"><span class="pay-row-label">Today</span><button class="amount-link" data-amount-link>$0</button></div>`;
+    const todayRow = `<div class="pay-row pay-row--no-divider"><span class="pay-row-label">Today (0)</span><button class="amount-link" data-amount-link>$0</button></div>`;
     const upcomingTop = todayFirst
       ? `${todayRow}${upcomingLabel}`
       : `${upcomingLabel}${todayRow}`;
@@ -242,13 +242,13 @@
       <div class="pay-section">
         <div>
           ${upcomingTop}
-          <div class="pay-row"><span class="pay-row-label">Next 7 days</span><button class="amount-link" data-amount-link>$0</button></div>
-          <div class="pay-row"><span class="pay-row-label">Next 30 days</span><button class="amount-link" data-amount-link>$0</button></div>
+          <div class="pay-row pay-row--spaced"><span class="pay-row-label">Next 7 days (0)</span><button class="amount-link" data-amount-link>$0</button></div>
+          <div class="pay-row pay-row--spaced"><span class="pay-row-label">Next 30 days (0)</span><button class="amount-link" data-amount-link>$0</button></div>
         </div>
         <div>
           <div class="pay-block-label">Past</div>
-          <div class="pay-row"><span class="pay-row-label">Last 7 days</span><button class="amount-link" data-amount-link>$0</button></div>
-          <div class="pay-row"><span class="pay-row-label">Last 30 days</span><button class="amount-link" data-amount-link>$0</button></div>
+          <div class="pay-row pay-row--spaced"><span class="pay-row-label">Last 7 days (0)</span><button class="amount-link" data-amount-link>$0</button></div>
+          <div class="pay-row pay-row--spaced"><span class="pay-row-label">Last 30 days (0)</span><button class="amount-link" data-amount-link>$0</button></div>
         </div>
       </div>
     `;
