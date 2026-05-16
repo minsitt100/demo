@@ -52,7 +52,7 @@ button { font-family: inherit; cursor: pointer; }
   top: 0; left: 0; right: 0;
   height: var(--topbar-h);
   background: var(--bg);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--secondary);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -146,15 +146,18 @@ button { font-family: inherit; cursor: pointer; }
 }
 .header-action {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 2px;
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  padding: 8px 10px;
+  padding: 4px 8px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
+  line-height: 1.2;
 }
 .header-action:hover { background: var(--bg-secondary); color: var(--text); }
 
