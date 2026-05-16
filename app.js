@@ -181,7 +181,7 @@
           <h2 class="card-title">Payments Out</h2>
           ${customizing ? moveControls(id, index) : ''}
         </div>
-        ${paymentsBlock()}
+        ${paymentsBlock({ todayFirst: true })}
       </section>
     `,
   };
