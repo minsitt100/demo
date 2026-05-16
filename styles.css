@@ -559,8 +559,6 @@ button { font-family: inherit; cursor: pointer; }
   padding: 10px 24px;
   margin: 12px -24px;
 }
-.pay-row--no-divider { border-bottom: none; padding-bottom: 4px; }
-.pay-row--spaced { padding: 14px 0; }
 .pay-row {
   display: flex;
   justify-content: space-between;
@@ -570,6 +568,8 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 13px;
 }
 .pay-row:last-child { border-bottom: none; }
+.pay-row--spaced { padding: 14px 0; }
+.pay-row--no-divider { border-bottom: none; padding-bottom: 4px; }
 .pay-row-label { color: var(--text-secondary); }
 .pay-row-value { font-weight: 600; color: var(--secondary); }
 
