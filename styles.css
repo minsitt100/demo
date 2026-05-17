@@ -471,6 +471,29 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--text-secondary);
   margin-top: 12px;
 }
+.kpi-row--flat .kpi:last-child { text-align: right; }
+
+/* Split Pay button: label | divider | chevron */
+.btn.pay-btn {
+  padding: 0;
+  gap: 0;
+  align-items: stretch;
+}
+.pay-btn-text {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+}
+.pay-btn-divider {
+  width: 1px;
+  background: currentColor;
+  opacity: 0.45;
+}
+.pay-btn-chevron {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+}
 
 /* Approvals table */
 .approvals-table {
