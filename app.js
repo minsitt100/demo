@@ -153,8 +153,23 @@
         return buckets;
       },
       selectOpenInvoices() {
-        // No AR / customer-invoice flow yet — always zero.
-        return emptyBuckets();
+        const today = todayIso();
+        const buckets = emptyBuckets();
+        state.invoices.forEach((inv) => {
+          const auto = inv.autopopulate || {};
+          const amount = Number((auto['rs-amount'] && auto['rs-amount'].value) || 0)
+            || parseFloat(String(inv.amount || '').replace(/[^\d.-]/g, ''))
+            || 0;
+          const dueDate = (auto['rs-due-date'] && auto['rs-due-date'].value) || inv.dueDate || null;
+          buckets.total.amount += amount;
+          buckets.total.count++;
+          if (!dueDate) return; // can't bucket without a due date
+          const dd = daysBetween(today, dueDate);
+          if (dd < 0) { buckets.overdue.amount += amount; buckets.overdue.count++; }
+          else if (dd <= 7) { buckets.due7.amount += amount; buckets.due7.count++; }
+          else { buckets.due7plus.amount += amount; buckets.due7plus.count++; }
+        });
+        return buckets;
       },
       selectPaymentsOut() {
         const today = todayIso();
