@@ -304,7 +304,15 @@
       <section class="card${customizing ? ' card--customizing' : ''}">
         <div class="card-header">
           <h2 class="card-title">Bills to Pay ${INFO_ICON('Bills awaiting payment')}</h2>
-          ${headerAction(id, index, `<button class="btn" data-action="pay">Pay</button>`)}
+          ${headerAction(id, index, `
+            <button class="btn pay-btn" data-action="pay">
+              <span class="pay-btn-text">Pay</span>
+              <span class="pay-btn-divider" aria-hidden="true"></span>
+              <span class="pay-btn-chevron" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </span>
+            </button>
+          `)}
         </div>
         <div class="kpi-row kpi-row--flat">
           <div class="kpi kpi-urgent"><div class="kpi-label">Overdue</div><div class="kpi-value">${formatMoney(b.overdue.amount)}</div><div class="kpi-sub">${b.overdue.count} BILLS</div></div>
