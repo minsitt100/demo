@@ -5,7 +5,22 @@
 
   toggleBtn.addEventListener('click', () => layout.classList.toggle('nav-collapsed'));
 
-  const invoices = [
+  // ===== Helpers =====
+  function todayIso() {
+    return new Date().toISOString().split('T')[0];
+  }
+  function daysBetween(fromIso, toIso) {
+    if (!fromIso || !toIso) return 0;
+    const f = new Date(fromIso + 'T00:00:00');
+    const t = new Date(toIso + 'T00:00:00');
+    return Math.round((t - f) / 86400000);
+  }
+  function formatMoney(n) {
+    return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // ===== Store =====
+  const SEEDED_INVOICES = [
     {
       id: 'inv-1',
       vendor: 'Acme Supplies Co.',
@@ -23,6 +38,132 @@
       },
     },
   ];
+
+  const emptyBuckets = () => ({
+    overdue: { amount: 0, count: 0 },
+    due7: { amount: 0, count: 0 },
+    due7plus: { amount: 0, count: 0 },
+    total: { amount: 0, count: 0 },
+  });
+  const emptyPaymentBuckets = () => ({
+    today: { amount: 0, count: 0 },
+    next7: { amount: 0, count: 0 },
+    next30: { amount: 0, count: 0 },
+    last7: { amount: 0, count: 0 },
+    last30: { amount: 0, count: 0 },
+  });
+
+  const store = (() => {
+    const state = {
+      invoices: SEEDED_INVOICES.map((i) => ({ ...i })),
+      bills: [],
+      payments: [],
+    };
+    const subs = new Set();
+    const notify = () => subs.forEach((fn) => fn(state));
+
+    return {
+      state,
+      subscribe(fn) { subs.add(fn); return () => subs.delete(fn); },
+
+      // ---- Inbox / invoices ----
+      addInvoice(invoice) { state.invoices.unshift(invoice); notify(); },
+      removeInvoice(id) {
+        const idx = state.invoices.findIndex((i) => i.id === id);
+        if (idx !== -1) state.invoices.splice(idx, 1);
+        notify();
+      },
+
+      // ---- Bills ----
+      createBillFromInvoice(invoiceId, fields) {
+        const inv = state.invoices.find((i) => i.id === invoiceId);
+        const bill = {
+          id: 'bill-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+          invoiceId,
+          vendor: (fields.vendor || (inv && inv.vendor) || 'Unknown').trim(),
+          number: (fields.invoiceNumber || (inv && inv.number) || '').trim(),
+          poNumber: (fields.poNumber || '').trim(),
+          paymentTerm: fields.paymentTerm || 'Net 30',
+          invoiceDate: fields.invoiceDate || todayIso(),
+          glDate: fields.glDate || todayIso(),
+          dueDate: fields.dueDate || todayIso(),
+          amount: Number(fields.amount) || 0,
+          description: (fields.description || '').trim(),
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        };
+        state.bills.push(bill);
+        const idx = state.invoices.findIndex((i) => i.id === invoiceId);
+        if (idx !== -1) state.invoices.splice(idx, 1);
+        notify();
+        return bill;
+      },
+
+      // ---- Payments (AP-side) ----
+      payBill(billId, method) {
+        const bill = state.bills.find((b) => b.id === billId);
+        if (!bill || bill.status === 'paid') return null;
+        bill.status = 'paid';
+        const payment = {
+          id: 'pay-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+          billId,
+          vendor: bill.vendor,
+          amount: bill.amount,
+          method,
+          sentAt: todayIso(),
+        };
+        state.payments.push(payment);
+        notify();
+        return payment;
+      },
+      payNextDueBill(method) {
+        const pending = state.bills
+          .filter((b) => b.status === 'pending')
+          .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+        if (!pending.length) return null;
+        return this.payBill(pending[0].id, method);
+      },
+
+      // ---- Selectors ----
+      selectBillsToPay() {
+        const today = todayIso();
+        const buckets = emptyBuckets();
+        state.bills.filter((b) => b.status === 'pending').forEach((b) => {
+          const dd = daysBetween(today, b.dueDate);
+          buckets.total.amount += b.amount;
+          buckets.total.count++;
+          if (dd < 0) { buckets.overdue.amount += b.amount; buckets.overdue.count++; }
+          else if (dd <= 7) { buckets.due7.amount += b.amount; buckets.due7.count++; }
+          else { buckets.due7plus.amount += b.amount; buckets.due7plus.count++; }
+        });
+        return buckets;
+      },
+      selectOpenInvoices() {
+        // No AR / customer-invoice flow yet — always zero.
+        return emptyBuckets();
+      },
+      selectPaymentsOut() {
+        const today = todayIso();
+        const b = emptyPaymentBuckets();
+        state.payments.forEach((p) => {
+          const days = daysBetween(today, p.sentAt);
+          if (days === 0) { b.today.amount += p.amount; b.today.count++; }
+          if (days > 0 && days <= 7) { b.next7.amount += p.amount; b.next7.count++; }
+          if (days > 0 && days <= 30) { b.next30.amount += p.amount; b.next30.count++; }
+          if (days < 0 && days >= -7) { b.last7.amount += p.amount; b.last7.count++; }
+          if (days < 0 && days >= -30) { b.last30.amount += p.amount; b.last30.count++; }
+        });
+        return b;
+      },
+      selectPaymentsIn() {
+        // No customer-payment flow yet.
+        return emptyPaymentBuckets();
+      },
+    };
+  })();
+
+  const invoices = store.state.invoices;
+
 
   const routes = {
     overview: renderOverview,
@@ -56,13 +197,30 @@
     });
   }
 
+  let currentRoute = null;
+  let currentCtx = null;
+
   function navigate(route, ctx) {
     const fn = routes[route] || routes.overview;
+    currentRoute = route;
+    currentCtx = ctx;
     // Highlight parent route in nav for the split view
     setActive(route === 'review-save' ? 'inbox' : route);
     content.innerHTML = '';
     fn(ctx);
   }
+
+  store.subscribe(() => {
+    // Re-render screens that read from the store. Skip Review & Save so
+    // the user's in-progress form isn't blown away.
+    if (currentRoute === 'overview' || currentRoute === 'inbox') {
+      const fn = routes[currentRoute];
+      if (fn) {
+        content.innerHTML = '';
+        fn(currentCtx);
+      }
+    }
+  });
 
   // ===== Overview =====
   const DEFAULT_OVERVIEW_ORDER = ['bills-to-pay', 'open-invoices', 'bill-approvals', 'payments-in', 'payments-out'];
@@ -99,7 +257,9 @@
   }
 
   const cardRenderers = {
-    'bills-to-pay': (id, index) => `
+    'bills-to-pay': (id, index) => {
+      const b = store.selectBillsToPay();
+      return `
       <section class="card${customizing ? ' card--customizing' : ''}">
         <div class="card-header">
           <h2 class="card-title">Bills to Pay
@@ -110,27 +270,31 @@
           ${headerAction(id, index, `<button class="btn" data-action="pay">Pay</button>`)}
         </div>
         <div class="kpi-row kpi-row--flat">
-          <div class="kpi kpi-urgent"><div class="kpi-label">Overdue</div><div class="kpi-value">$0</div><div class="kpi-sub">0 BILLS</div></div>
-          <div class="kpi kpi-warning"><div class="kpi-label">Due 7 Days</div><div class="kpi-value">$0</div><div class="kpi-sub">0 BILLS</div></div>
-          <div class="kpi"><div class="kpi-label">Due 7+ Days</div><div class="kpi-value">$0</div><div class="kpi-sub">0 BILLS</div></div>
-          <div class="kpi"><div class="kpi-label">Total to pay</div><div class="kpi-value">$0</div><div class="kpi-sub">0 BILLS</div></div>
+          <div class="kpi kpi-urgent"><div class="kpi-label">Overdue</div><div class="kpi-value">${formatMoney(b.overdue.amount)}</div><div class="kpi-sub">${b.overdue.count} BILLS</div></div>
+          <div class="kpi kpi-warning"><div class="kpi-label">Due 7 Days</div><div class="kpi-value">${formatMoney(b.due7.amount)}</div><div class="kpi-sub">${b.due7.count} BILLS</div></div>
+          <div class="kpi"><div class="kpi-label">Due 7+ Days</div><div class="kpi-value">${formatMoney(b.due7plus.amount)}</div><div class="kpi-sub">${b.due7plus.count} BILLS</div></div>
+          <div class="kpi"><div class="kpi-label">Total to pay</div><div class="kpi-value">${formatMoney(b.total.amount)}</div><div class="kpi-sub">${b.total.count} BILLS</div></div>
         </div>
       </section>
-    `,
-    'open-invoices': (id, index) => `
+    `;
+    },
+    'open-invoices': (id, index) => {
+      const b = store.selectOpenInvoices();
+      return `
       <section class="card${customizing ? ' card--customizing' : ''}">
         <div class="card-header">
           <h2 class="card-title">Open Invoices</h2>
           ${headerAction(id, index, `<button class="btn" data-action="create-invoice">Create Invoice</button>`)}
         </div>
         <div class="kpi-row kpi-row--flat">
-          <div class="kpi kpi-urgent"><div class="kpi-label">Overdue</div><div class="kpi-value">$0</div><div class="kpi-sub">0 INVOICES</div></div>
-          <div class="kpi kpi-warning"><div class="kpi-label">Due 7 Days</div><div class="kpi-value">$0</div><div class="kpi-sub">0 INVOICES</div></div>
-          <div class="kpi"><div class="kpi-label">Due 7+ Days</div><div class="kpi-value">$0</div><div class="kpi-sub">0 INVOICES</div></div>
-          <div class="kpi"><div class="kpi-label">Total owed</div><div class="kpi-value">$0</div><div class="kpi-sub">0 INVOICES</div></div>
+          <div class="kpi kpi-urgent"><div class="kpi-label">Overdue</div><div class="kpi-value">${formatMoney(b.overdue.amount)}</div><div class="kpi-sub">${b.overdue.count} INVOICES</div></div>
+          <div class="kpi kpi-warning"><div class="kpi-label">Due 7 Days</div><div class="kpi-value">${formatMoney(b.due7.amount)}</div><div class="kpi-sub">${b.due7.count} INVOICES</div></div>
+          <div class="kpi"><div class="kpi-label">Due 7+ Days</div><div class="kpi-value">${formatMoney(b.due7plus.amount)}</div><div class="kpi-sub">${b.due7plus.count} INVOICES</div></div>
+          <div class="kpi"><div class="kpi-label">Total owed</div><div class="kpi-value">${formatMoney(b.total.amount)}</div><div class="kpi-sub">${b.total.count} INVOICES</div></div>
         </div>
       </section>
-    `,
+    `;
+    },
     'bill-approvals': (id, index) => `
       <section class="card${customizing ? ' card--customizing' : ''}">
         <div class="card-header">
@@ -172,7 +336,7 @@
           <h2 class="card-title">Payments In</h2>
           ${headerAction(id, index, `<button class="btn" data-action="get-paid">Get Paid</button>`)}
         </div>
-        ${paymentsBlock({ todayFirst: true })}
+        ${paymentsBlock({ todayFirst: true, kind: 'in' })}
       </section>
     `,
     'payments-out': (id, index) => `
@@ -181,7 +345,7 @@
           <h2 class="card-title">Payments Out</h2>
           ${customizing ? moveControls(id, index) : ''}
         </div>
-        ${paymentsBlock({ todayFirst: true })}
+        ${paymentsBlock({ todayFirst: true, kind: 'out' })}
       </section>
     `,
   };
@@ -223,7 +387,11 @@
 
     content.querySelectorAll('[data-action]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
-        alert(`Action: ${e.currentTarget.dataset.action}`);
+        const action = e.currentTarget.dataset.action;
+        if (action === 'pay') openPayModal();
+        else if (action === 'create-invoice') alert('Create Invoice (coming soon)');
+        else if (action === 'get-paid') alert('Get Paid (coming soon)');
+        else alert(`Action: ${action}`);
       });
     });
 
@@ -232,23 +400,85 @@
     });
   }
 
-  function paymentsBlock({ todayFirst = false } = {}) {
+  // ===== Pay modal =====
+  function openPayModal() {
+    const pending = store.state.bills
+      .filter((b) => b.status === 'pending')
+      .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+    if (!pending.length) {
+      alert('No pending bills to pay. Save a bill from the Inbox first.');
+      return;
+    }
+    const next = pending[0];
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" aria-label="Pay bill">
+        <div class="modal-header">
+          <h3>Pay Bill</h3>
+          <button type="button" class="modal-close" aria-label="Close">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="pay-summary">
+            <div class="pay-summary-row"><span>Vendor</span><strong>${escapeHtml(next.vendor)}</strong></div>
+            <div class="pay-summary-row"><span>Bill #</span><strong>${escapeHtml(next.number || '—')}</strong></div>
+            <div class="pay-summary-row"><span>Due</span><strong>${escapeHtml(next.dueDate || '—')}</strong></div>
+            <div class="pay-summary-row"><span>Amount</span><strong class="pay-summary-amount">${formatMoney(next.amount)}</strong></div>
+          </div>
+          <div class="modal-section-label">Payment method</div>
+          <div class="pay-method-grid">
+            <button type="button" class="pay-method" data-method="Virtual Card">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              <span>Virtual Card</span>
+            </button>
+            <button type="button" class="pay-method" data-method="ACH">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 10 12 3 21 10"/><line x1="5" y1="10" x2="5" y2="18"/><line x1="9" y1="10" x2="9" y2="18"/><line x1="15" y1="10" x2="15" y2="18"/><line x1="19" y1="10" x2="19" y2="18"/><line x1="3" y1="21" x2="21" y2="21"/></svg>
+              <span>ACH (epayment)</span>
+            </button>
+            <button type="button" class="pay-method" data-method="Check">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="1"/><line x1="6" y1="14" x2="10" y2="14"/><circle cx="18" cy="12" r="2"/></svg>
+              <span>Check</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+
+    const close = () => backdrop.remove();
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+    backdrop.querySelector('.modal-close').addEventListener('click', close);
+    backdrop.querySelectorAll('.pay-method').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        store.payBill(next.id, btn.dataset.method);
+        close();
+      });
+    });
+    document.addEventListener('keydown', function onKey(e) {
+      if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+    });
+  }
+
+  function paymentsBlock({ todayFirst = false, kind = 'out' } = {}) {
+    const data = kind === 'in' ? store.selectPaymentsIn() : store.selectPaymentsOut();
+    const row = (label, slice, extra = '') =>
+      `<div class="pay-row ${extra}"><span class="pay-row-label">${label} (${slice.count})</span><button class="amount-link" data-amount-link>${formatMoney(slice.amount)}</button></div>`;
     const upcomingLabel = `<div class="pay-block-label">Upcoming Payments</div>`;
-    const todayRow = `<div class="pay-row pay-row--no-divider"><span class="pay-row-label">Today (0)</span><button class="amount-link" data-amount-link>$0</button></div>`;
-    const upcomingTop = todayFirst
-      ? `${todayRow}${upcomingLabel}`
-      : `${upcomingLabel}${todayRow}`;
+    const todayRow = row('Today', data.today, 'pay-row--no-divider');
+    const upcomingTop = todayFirst ? `${todayRow}${upcomingLabel}` : `${upcomingLabel}${todayRow}`;
     return `
       <div class="pay-section">
         <div>
           ${upcomingTop}
-          <div class="pay-row pay-row--spaced"><span class="pay-row-label">Next 7 days (0)</span><button class="amount-link" data-amount-link>$0</button></div>
-          <div class="pay-row pay-row--spaced"><span class="pay-row-label">Next 30 days (0)</span><button class="amount-link" data-amount-link>$0</button></div>
+          ${row('Next 7 days', data.next7, 'pay-row--spaced')}
+          ${row('Next 30 days', data.next30, 'pay-row--spaced')}
         </div>
         <div>
           <div class="pay-block-label">Past</div>
-          <div class="pay-row pay-row--spaced"><span class="pay-row-label">Last 7 days (0)</span><button class="amount-link" data-amount-link>$0</button></div>
-          <div class="pay-row pay-row--spaced"><span class="pay-row-label">Last 30 days (0)</span><button class="amount-link" data-amount-link>$0</button></div>
+          ${row('Last 7 days', data.last7, 'pay-row--spaced')}
+          ${row('Last 30 days', data.last30, 'pay-row--spaced')}
         </div>
       </div>
     `;
@@ -307,10 +537,9 @@
     try {
       for (const file of files) {
         const inv = await ingestUploadedPdf(file);
-        invoices.unshift(inv);
+        store.addInvoice(inv);
       }
       if (statusEl) statusEl.textContent = `Imported ${files.length} invoice${files.length > 1 ? 's' : ''}.`;
-      renderInbox();
     } catch (err) {
       console.error(err);
       if (statusEl) statusEl.textContent = 'Sorry, we had trouble reading that PDF.';
@@ -666,7 +895,23 @@
 
     content.querySelector('#review-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      alert('Bill saved (placeholder).');
+      const val = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value : '';
+      };
+      const fields = {
+        vendor: val('rs-vendor'),
+        invoiceNumber: val('rs-inv-number'),
+        poNumber: val('rs-po-number'),
+        paymentTerm: val('rs-payment-term'),
+        invoiceDate: val('rs-inv-date'),
+        glDate: val('rs-gl-date'),
+        dueDate: val('rs-due-date'),
+        amount: val('rs-amount'),
+        description: val('rs-bill-desc'),
+      };
+      const bill = store.createBillFromInvoice(inv.id, fields);
+      if (bill && bill.pdf == null && inv.pdf) bill.pdf = inv.pdf;
       navigate('inbox');
     });
 
