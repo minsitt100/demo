@@ -291,17 +291,19 @@
     return customizing ? moveControls(id, index) : defaultAction;
   }
 
+  const INFO_ICON = (tooltip) => `
+    <span class="info-icon" title="${escapeHtml(tooltip)}">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </span>
+  `;
+
   const cardRenderers = {
     'bills-to-pay': (id, index) => {
       const b = store.selectBillsToPay();
       return `
       <section class="card${customizing ? ' card--customizing' : ''}">
         <div class="card-header">
-          <h2 class="card-title">Bills to Pay
-            <span class="info-icon" title="Bills awaiting payment">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            </span>
-          </h2>
+          <h2 class="card-title">Bills to Pay ${INFO_ICON('Bills awaiting payment')}</h2>
           ${headerAction(id, index, `<button class="btn" data-action="pay">Pay</button>`)}
         </div>
         <div class="kpi-row kpi-row--flat">
@@ -318,7 +320,7 @@
       return `
       <section class="card${customizing ? ' card--customizing' : ''}">
         <div class="card-header">
-          <h2 class="card-title">Open Invoices</h2>
+          <h2 class="card-title">Open Invoices ${INFO_ICON('Invoices in your Inbox waiting to be saved as bills')}</h2>
           ${headerAction(id, index, `<button class="btn" data-action="create-invoice">Create Invoice</button>`)}
         </div>
         <div class="kpi-row kpi-row--flat">
@@ -333,7 +335,7 @@
     'bill-approvals': (id, index) => `
       <section class="card${customizing ? ' card--customizing' : ''}">
         <div class="card-header">
-          <h2 class="card-title">Bill Approvals</h2>
+          <h2 class="card-title">Bill Approvals ${INFO_ICON('Bills pending approval, grouped by approver and age')}</h2>
           ${headerAction(id, index, `
             <label class="toggle">
               <input type="checkbox" id="assigned-to-me" />
@@ -368,7 +370,7 @@
     'payments-in': (id, index) => `
       <section class="card${customizing ? ' card--customizing' : ''}">
         <div class="card-header">
-          <h2 class="card-title">Payments In</h2>
+          <h2 class="card-title">Payments In ${INFO_ICON('Payments received from customers')}</h2>
           ${headerAction(id, index, `<button class="btn" data-action="get-paid">Get Paid</button>`)}
         </div>
         ${paymentsBlock({ todayFirst: true, kind: 'in' })}
@@ -377,7 +379,7 @@
     'payments-out': (id, index) => `
       <section class="card${customizing ? ' card--customizing' : ''}">
         <div class="card-header">
-          <h2 class="card-title">Payments Out</h2>
+          <h2 class="card-title">Payments Out ${INFO_ICON('Payments sent to vendors')}</h2>
           ${customizing ? moveControls(id, index) : ''}
         </div>
         ${paymentsBlock({ todayFirst: true, kind: 'out' })}
