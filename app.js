@@ -58,6 +58,9 @@
       invoices: SEEDED_INVOICES.map((i) => ({ ...i })),
       bills: [],
       payments: [],
+      vendorPreferences: {
+        'Acme Supplies Co.': { preferredMethod: 'ACH' },
+      },
     };
     const subs = new Set();
     const notify = () => subs.forEach((fn) => fn(state));
@@ -65,6 +68,17 @@
     return {
       state,
       subscribe(fn) { subs.add(fn); return () => subs.delete(fn); },
+
+      // ---- Vendor preferences ----
+      getVendorPreferredMethod(vendor) {
+        const v = state.vendorPreferences[vendor];
+        return (v && v.preferredMethod) || 'ACH';
+      },
+      setVendorPreferredMethod(vendor, method) {
+        if (!state.vendorPreferences[vendor]) state.vendorPreferences[vendor] = {};
+        state.vendorPreferences[vendor].preferredMethod = method;
+        notify();
+      },
 
       // ---- Inbox / invoices ----
       addInvoice(invoice) { state.invoices.unshift(invoice); notify(); },
@@ -172,7 +186,9 @@
     'review-save': renderReviewSave,
     vendors: () => placeholder('Vendors'),
     approvals: () => placeholder('Approvals'),
-    bills: () => placeholder('Bills'),
+    bills: renderBills,
+    'review-pay': renderReviewPay,
+    'pay-confirmation': renderPayConfirmation,
     'payments-out': () => placeholder('Payments Out'),
     customers: () => placeholder('Customers'),
     items: () => placeholder('Items'),
@@ -200,20 +216,24 @@
   let currentRoute = null;
   let currentCtx = null;
 
+  const REACTIVE_ROUTES = new Set(['overview', 'inbox', 'bills']);
+  const NAV_PARENT = {
+    'review-save': 'inbox',
+    'review-pay': 'bills',
+    'pay-confirmation': 'bills',
+  };
+
   function navigate(route, ctx) {
     const fn = routes[route] || routes.overview;
     currentRoute = route;
     currentCtx = ctx;
-    // Highlight parent route in nav for the split view
-    setActive(route === 'review-save' ? 'inbox' : route);
+    setActive(NAV_PARENT[route] || route);
     content.innerHTML = '';
     fn(ctx);
   }
 
   store.subscribe(() => {
-    // Re-render screens that read from the store. Skip Review & Save so
-    // the user's in-progress form isn't blown away.
-    if (currentRoute === 'overview' || currentRoute === 'inbox') {
+    if (REACTIVE_ROUTES.has(currentRoute)) {
       const fn = routes[currentRoute];
       if (fn) {
         content.innerHTML = '';
@@ -1212,6 +1232,189 @@
     if (!svg) return;
     svg.innerHTML = '';
     svg.classList.remove('visible');
+  }
+
+  // ===== Bills =====
+  const PAY_METHODS = [
+    {
+      key: 'Virtual Card',
+      icon: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+    },
+    {
+      key: 'ACH',
+      label: 'ACH (epayment)',
+      icon: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 10 12 3 21 10"/><line x1="5" y1="10" x2="5" y2="18"/><line x1="9" y1="10" x2="9" y2="18"/><line x1="15" y1="10" x2="15" y2="18"/><line x1="19" y1="10" x2="19" y2="18"/><line x1="3" y1="21" x2="21" y2="21"/></svg>',
+    },
+    {
+      key: 'Check',
+      icon: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="1"/><line x1="6" y1="14" x2="10" y2="14"/><circle cx="18" cy="12" r="2"/></svg>',
+    },
+  ];
+
+  function renderBills() {
+    const bills = store.state.bills;
+    content.innerHTML = `
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Bills</h1>
+          <div class="page-subtitle" style="color:var(--text-secondary);font-size:13px;">${bills.length} bill${bills.length === 1 ? '' : 's'}</div>
+        </div>
+      </div>
+      ${bills.length === 0 ? `
+        <div class="empty-state">
+          <div class="empty-state-title">No bills yet</div>
+          <div class="empty-state-text">Save an invoice from the Inbox to create your first bill.</div>
+        </div>
+      ` : `
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th class="col-check"><input type="checkbox" class="check-all" aria-label="Select all" /></th>
+                <th>Invoice #</th>
+                <th>Amount</th>
+                <th>Due Date</th>
+                <th>Vendor</th>
+                <th>Preferred Method</th>
+                <th>Status</th>
+                <th class="col-actions"></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bills.map((b) => `
+                <tr data-bill-id="${b.id}">
+                  <td class="col-check"><input type="checkbox" class="row-check" data-id="${b.id}" aria-label="Select ${escapeHtml(b.number)}" /></td>
+                  <td>${escapeHtml(b.number || '—')}</td>
+                  <td>${formatMoney(b.amount)}</td>
+                  <td>${escapeHtml(formatDisplayDate(b.dueDate))}</td>
+                  <td>${escapeHtml(b.vendor)}</td>
+                  <td>${escapeHtml(store.getVendorPreferredMethod(b.vendor))}</td>
+                  <td><span class="status-pill ${b.status === 'paid' ? 'paid' : 'pending'}">${b.status === 'paid' ? 'Paid' : 'Pending'}</span></td>
+                  <td class="col-actions">
+                    ${b.status === 'pending'
+                      ? `<button class="btn" data-review-pay="${b.id}">Review &amp; Pay</button>`
+                      : ''}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `}
+    `;
+
+    content.querySelectorAll('[data-review-pay]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const bill = store.state.bills.find((b) => b.id === btn.dataset.reviewPay);
+        if (bill) navigate('review-pay', bill);
+      });
+    });
+
+    const checkAll = content.querySelector('.check-all');
+    if (checkAll) {
+      checkAll.addEventListener('change', () => {
+        content.querySelectorAll('.row-check').forEach((c) => (c.checked = checkAll.checked));
+      });
+    }
+  }
+
+  // ===== Review & Pay =====
+  function renderReviewPay(bill) {
+    if (!bill) { navigate('bills'); return; }
+    const preferred = store.getVendorPreferredMethod(bill.vendor);
+    let selected = preferred;
+
+    content.innerHTML = `
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Review &amp; Pay</h1>
+          <div class="page-subtitle" style="color:var(--text-secondary);font-size:13px;">${escapeHtml(bill.vendor)} · ${escapeHtml(bill.number || '—')}</div>
+        </div>
+        <button class="btn btn-ghost" data-action="back-to-bills">← Back to Bills</button>
+      </div>
+      <div class="review-pay">
+        <section class="card">
+          <div class="card-header"><h2 class="card-title">Bill details</h2></div>
+          <div class="detail-list">
+            <div class="detail-row"><span>Vendor</span><strong>${escapeHtml(bill.vendor)}</strong></div>
+            <div class="detail-row"><span>Invoice #</span><strong>${escapeHtml(bill.number || '—')}</strong></div>
+            <div class="detail-row"><span>PO Number</span><strong>${escapeHtml(bill.poNumber || '—')}</strong></div>
+            <div class="detail-row"><span>Invoice Date</span><strong>${escapeHtml(formatDisplayDate(bill.invoiceDate))}</strong></div>
+            <div class="detail-row"><span>Due Date</span><strong>${escapeHtml(formatDisplayDate(bill.dueDate))}</strong></div>
+            <div class="detail-row"><span>Payment Term</span><strong>${escapeHtml(bill.paymentTerm)}</strong></div>
+            ${bill.description ? `<div class="detail-row"><span>Description</span><strong>${escapeHtml(bill.description)}</strong></div>` : ''}
+            <div class="detail-row detail-row--total"><span>Amount Due</span><strong>${formatMoney(bill.amount)}</strong></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header"><h2 class="card-title">Payment method</h2></div>
+          <div class="pay-method-grid" id="pay-method-grid">
+            ${PAY_METHODS.map((m) => `
+              <button type="button" class="pay-method${m.key === selected ? ' is-selected' : ''}" data-method="${m.key}">
+                ${m.icon}
+                <span>${escapeHtml(m.label || m.key)}${m.key === preferred ? ' <span class="pay-method-star" title="Vendor preferred">★</span>' : ''}</span>
+              </button>
+            `).join('')}
+          </div>
+          <div class="vendor-pref-hint">Vendor's preferred method: <strong>${escapeHtml(preferred)}</strong></div>
+          <div class="review-pay-actions">
+            <button type="button" class="btn btn-ghost" data-action="back-to-bills">Cancel</button>
+            <button type="button" class="btn btn-secondary" id="confirm-payment-btn">Confirm Payment</button>
+          </div>
+        </section>
+      </div>
+    `;
+
+    content.querySelectorAll('.pay-method').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        selected = btn.dataset.method;
+        content.querySelectorAll('.pay-method').forEach((b) =>
+          b.classList.toggle('is-selected', b === btn));
+      });
+    });
+    content.querySelectorAll('[data-action="back-to-bills"]').forEach((b) =>
+      b.addEventListener('click', () => navigate('bills'))
+    );
+    content.querySelector('#confirm-payment-btn').addEventListener('click', () => {
+      const snapshot = { ...bill };
+      const payment = store.payBill(bill.id, selected);
+      if (payment) navigate('pay-confirmation', { payment, bill: snapshot });
+    });
+  }
+
+  // ===== Payment Confirmation =====
+  function renderPayConfirmation(ctx) {
+    if (!ctx || !ctx.payment) { navigate('bills'); return; }
+    const { payment, bill } = ctx;
+    content.innerHTML = `
+      <div class="page-header">
+        <h1 class="page-title">Payment Confirmation</h1>
+      </div>
+      <div class="confirmation-wrap">
+        <div class="confirmation-icon">
+          <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4L19 6"/></svg>
+        </div>
+        <h2 class="confirmation-title">Payment sent</h2>
+        <p class="confirmation-subtitle">${formatMoney(payment.amount)} to ${escapeHtml(bill.vendor)}</p>
+        <div class="detail-list confirmation-details">
+          <div class="detail-row"><span>Bill #</span><strong>${escapeHtml(bill.number || '—')}</strong></div>
+          <div class="detail-row"><span>Method</span><strong>${escapeHtml(payment.method)}</strong></div>
+          <div class="detail-row"><span>Sent on</span><strong>${escapeHtml(formatDisplayDate(payment.sentAt))}</strong></div>
+          <div class="detail-row"><span>Confirmation #</span><strong>${escapeHtml(payment.id)}</strong></div>
+        </div>
+        <div class="confirmation-actions">
+          <button type="button" class="btn btn-ghost" data-action="back-to-bills">Back to Bills</button>
+          <button type="button" class="btn" data-action="go-overview">Go to Overview</button>
+        </div>
+      </div>
+    `;
+    content.querySelectorAll('[data-action="back-to-bills"]').forEach((b) =>
+      b.addEventListener('click', () => navigate('bills'))
+    );
+    content.querySelectorAll('[data-action="go-overview"]').forEach((b) =>
+      b.addEventListener('click', () => navigate('overview'))
+    );
   }
 
   // ===== Placeholder =====
