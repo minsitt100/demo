@@ -486,8 +486,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .pay-btn-divider {
   width: 1px;
-  background: currentColor;
-  opacity: 0.45;
+  background: var(--secondary);
 }
 .pay-btn-chevron {
   display: inline-flex;
