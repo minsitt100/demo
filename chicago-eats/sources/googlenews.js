@@ -75,5 +75,7 @@ export async function fetchItems() {
   // Follows the Google redirect to the real publisher during verification;
   // dead-ends 404 as expected.
   const alive = await verifyMany(out.map((o) => o.url));
-  return out.filter((o) => alive.get(o.url));
+  const survivors = out.filter((o) => alive.get(o.url));
+  const { enrichWithRestaurants } = await import("./extract.js");
+  return await enrichWithRestaurants(survivors);
 }

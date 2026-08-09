@@ -10,6 +10,7 @@
     "scrape": "node -e \"import('./scraper.js').then(m => m.runAllSources().then(n => { console.log('done:', n, 'new'); process.exit(0); }))\"",
     "seed:demo": "node scripts/seed-demo.js",
     "verify:urls": "node scripts/verify-urls.js",
+    "enrich:restaurants": "node scripts/enrich-restaurants.js",
     "peek:feed": "node scripts/peek-feed.js"
   },
   "engines": {

@@ -10,19 +10,20 @@ db.pragma("journal_mode = WAL");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS openings (
-    id            TEXT PRIMARY KEY,
-    source        TEXT NOT NULL,
-    source_label  TEXT NOT NULL,
-    url           TEXT NOT NULL UNIQUE,
-    title         TEXT NOT NULL,
-    restaurant    TEXT,
-    neighborhood  TEXT,
-    status        TEXT NOT NULL DEFAULT 'opening',
-    summary       TEXT,
-    image_url     TEXT,
-    published_at  TEXT,
-    seen_at       TEXT NOT NULL DEFAULT (datetime('now')),
-    is_hidden     INTEGER NOT NULL DEFAULT 0
+    id                    TEXT PRIMARY KEY,
+    source                TEXT NOT NULL,
+    source_label          TEXT NOT NULL,
+    url                   TEXT NOT NULL UNIQUE,
+    title                 TEXT NOT NULL,
+    restaurant            TEXT,
+    neighborhood          TEXT,
+    status                TEXT NOT NULL DEFAULT 'opening',
+    summary               TEXT,
+    image_url             TEXT,
+    published_at          TEXT,
+    seen_at               TEXT NOT NULL DEFAULT (datetime('now')),
+    is_hidden             INTEGER NOT NULL DEFAULT 0,
+    restaurants_mentioned TEXT
   );
 
   CREATE INDEX IF NOT EXISTS idx_openings_published ON openings(published_at DESC);
@@ -39,11 +40,21 @@ db.exec(`
   );
 `);
 
+// Migration: databases created before this column existed need it added.
+const existingCols = db.prepare("PRAGMA table_info(openings)").all().map((c) => c.name);
+if (!existingCols.includes("restaurants_mentioned")) {
+  db.exec("ALTER TABLE openings ADD COLUMN restaurants_mentioned TEXT");
+}
+
 const insertStmt = db.prepare(`
   INSERT OR IGNORE INTO openings
-    (id, source, source_label, url, title, restaurant, neighborhood, status, summary, image_url, published_at)
+    (id, source, source_label, url, title, restaurant, neighborhood, status, summary, image_url, published_at, restaurants_mentioned)
   VALUES
-    (@id, @source, @source_label, @url, @title, @restaurant, @neighborhood, @status, @summary, @image_url, @published_at)
+    (@id, @source, @source_label, @url, @title, @restaurant, @neighborhood, @status, @summary, @image_url, @published_at, @restaurants_mentioned)
+`);
+
+const updateRestaurantsStmt = db.prepare(`
+  UPDATE openings SET restaurants_mentioned = @restaurants_mentioned WHERE id = @id
 `);
 
 // Shared WHERE clause so list + count stay in sync. Each caller passes:
@@ -56,7 +67,8 @@ const FILTER_WHERE = `
 `;
 
 const listStmt = db.prepare(`
-  SELECT id, source, source_label, url, title, restaurant, neighborhood, status, summary, image_url, published_at, seen_at
+  SELECT id, source, source_label, url, title, restaurant, neighborhood, status,
+         summary, image_url, published_at, seen_at, restaurants_mentioned
   FROM openings
   WHERE ${FILTER_WHERE}
   ORDER BY COALESCE(published_at, seen_at) DESC
@@ -90,12 +102,22 @@ export const dbApi = {
     const tx = db.transaction((rows) => {
       let inserted = 0;
       for (const r of rows) {
+        // Ensure the new field is present so the prepared statement can bind.
+        if (r.restaurants_mentioned === undefined) r.restaurants_mentioned = null;
         const info = insertStmt.run(r);
         if (info.changes > 0) inserted++;
       }
       return inserted;
     });
     return tx(items);
+  },
+  setRestaurantsMentioned(id, jsonStr) {
+    return updateRestaurantsStmt.run({ id, restaurants_mentioned: jsonStr }).changes;
+  },
+  needsEnrichment() {
+    return db.prepare(
+      `SELECT id, url FROM openings WHERE is_hidden = 0 AND restaurants_mentioned IS NULL`
+    ).all();
   },
   list({ source = null, status = null, limit = 50, offset = 0, cutoff } = {}) {
     return listStmt.all({ source, status, limit, offset, cutoff });

@@ -37,6 +37,31 @@ function isFresh(iso) {
   return diff < 60 * 60 * 24 * 3; // 3 days
 }
 
+// Restaurant names extracted from the article body — shown as a chip row
+// so the user can see the specific places without clicking through.
+function renderMentionedChips(item) {
+  let list = [];
+  try {
+    list = item.restaurants_mentioned ? JSON.parse(item.restaurants_mentioned) : [];
+  } catch { list = []; }
+  // Drop the guessed restaurant if it's already the same as the card
+  // title's restaurant (avoid dupes).
+  if (item.restaurant) {
+    const r = item.restaurant.toLowerCase();
+    list = list.filter((x) => x.name.toLowerCase() !== r);
+  }
+  if (!list.length) return "";
+  return `
+    <div class="mentioned">
+      <span class="mentioned-label">Restaurants:</span>
+      <span class="mentioned-chips">
+        ${list.slice(0, 8).map((r) => `<span class="mchip">${escapeHtml(r.name)}</span>`).join("")}
+        ${list.length > 8 ? `<span class="mchip mchip-more">+${list.length - 8} more</span>` : ""}
+      </span>
+    </div>
+  `;
+}
+
 function toast(msg) {
   const t = $("#toast");
   t.textContent = msg;
@@ -101,6 +126,7 @@ function renderCard(item) {
         <h3 class="card-title">${escapeHtml(item.title)}</h3>
       </a>
       ${item.summary ? `<p class="card-summary">${escapeHtml(item.summary)}</p>` : ""}
+      ${renderMentionedChips(item)}
       <div class="card-actions">
         <span class="neighborhood">${item.neighborhood ? escapeHtml(item.neighborhood) : "Chicago"}</span>
         <button class="icon-btn" title="Hide from feed" aria-label="Hide" data-hide="${item.id}">✕</button>

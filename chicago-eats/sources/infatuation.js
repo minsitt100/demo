@@ -69,5 +69,7 @@ export async function fetchItems() {
     });
   }
   const alive = await verifyMany(out.map((o) => o.url));
-  return out.filter((o) => alive.get(o.url));
+  const survivors = out.filter((o) => alive.get(o.url));
+  const { enrichWithRestaurants } = await import("./extract.js");
+  return await enrichWithRestaurants(survivors);
 }

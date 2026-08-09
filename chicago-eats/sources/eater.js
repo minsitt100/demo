@@ -61,5 +61,8 @@ export async function fetchItems() {
   }
   // Drop any items whose article URL 404s at scrape time.
   const alive = await verifyMany(out.map((o) => o.url));
-  return out.filter((o) => alive.get(o.url));
+  const survivors = out.filter((o) => alive.get(o.url));
+  // Enrich with restaurant names extracted from the article body.
+  const { enrichWithRestaurants } = await import("./extract.js");
+  return await enrichWithRestaurants(survivors);
 }
