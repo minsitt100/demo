@@ -64,6 +64,22 @@ function normalizeName(n) {
     .trim();
 }
 
+// Reject values that are obviously article titles or headline fragments
+// rather than real restaurant names. Filters out the ambient noise you get
+// from title-guessing when the LLM extractor couldn't identify a specific
+// place (e.g. "New Fulton Market wine bar debuts…", "10 places to eat…").
+function looksLikeArticleTitle(name) {
+  if (!name) return false;
+  const t = name.trim();
+  if (t.length > 40) return true;                          // real names are short
+  if (/^\d/.test(t)) return true;                          // "10 Best…"
+  if (/\s(opens?|opening|debuts?|coming to|now open)\s/i.test(t)) return true;
+  if (/\bnew\s+(restaurants?|spots?|openings?|places?)/i.test(t)) return true;
+  if (/^(where|how|why|the best|best|these)\s/i.test(t)) return true;
+  if ((t.match(/,/g) || []).length >= 2) return true;      // list-comma structure
+  return false;
+}
+
 function aggregateRestaurants(openings) {
   const map = new Map(); // normalized name -> aggregate
 
@@ -73,14 +89,16 @@ function aggregateRestaurants(openings) {
       mentioned = o.restaurants_mentioned ? JSON.parse(o.restaurants_mentioned) : [];
     } catch { mentioned = []; }
 
-    // Seed with the title-guessed restaurant if we have one and it isn't
-    // already in the extracted list.
-    if (o.restaurant) {
-      const seen = mentioned.some((m) => normalizeName(m.name) === normalizeName(o.restaurant));
-      if (!seen) mentioned = [{ name: o.restaurant }, ...mentioned];
+    // Seed with the title-guessed restaurant only when (a) the LLM/regex
+    // extraction found nothing AND (b) the guess doesn't look like an
+    // article title. If we already have real extractions, don't pollute
+    // them with a noisy title-derived fallback.
+    if (o.restaurant && mentioned.length === 0 && !looksLikeArticleTitle(o.restaurant)) {
+      mentioned = [{ name: o.restaurant }];
     }
 
     for (const r of mentioned) {
+      if (looksLikeArticleTitle(r.name)) continue;
       const key = normalizeName(r.name);
       if (!key) continue;
 

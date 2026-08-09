@@ -113,19 +113,22 @@ function renderCard(r) {
     : "Chicago";
 
   el.innerHTML = `
-    <header class="rcard-head">
+    <header class="rcard-primary">
       <h3 class="rcard-name">${escapeHtml(r.name)}</h3>
-      ${cuisineChip(r.cuisine)}
+      <div class="rcard-location">
+        <span class="loc-icon" aria-hidden="true">📍</span>
+        <span class="loc-text">${escapeHtml(nbhd)}</span>
+      </div>
     </header>
-    <div class="rcard-meta">
-      <span class="nbhd">${escapeHtml(nbhd)}</span>
-      ${r.firstSeen ? `<span class="dot-sep">Since ${shortDate(r.firstSeen)}</span>` : ""}
+    <div class="rcard-tags">
+      ${cuisineChip(r.cuisine)}
+      ${r.firstSeen ? `<span class="since-tag">Since ${shortDate(r.firstSeen)}</span>` : ""}
     </div>
-    ${r.blurb ? `<p class="rcard-blurb">${escapeHtml(r.blurb)}</p>` : `<p class="rcard-blurb rcard-blurb-empty">—</p>`}
+    ${r.blurb ? `<p class="rcard-blurb">${escapeHtml(r.blurb)}</p>` : `<p class="rcard-blurb rcard-blurb-empty">No description yet.</p>`}
     <footer class="rcard-foot">
-      <span class="mention-count">${r.mentions} source${r.mentions === 1 ? "" : "s"}</span>
+      <span class="mention-count">${r.mentions} article${r.mentions === 1 ? "" : "s"}</span>
       <button class="rcard-toggle" data-toggle="${id}">
-        ${isExpanded ? "Hide sources" : "Show sources"}
+        ${isExpanded ? "Hide articles" : "Show articles"}
         <span class="chev" aria-hidden="true">${isExpanded ? "▴" : "▾"}</span>
       </button>
     </footer>

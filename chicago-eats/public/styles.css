@@ -216,20 +216,40 @@ a { color: inherit; text-decoration: none; }
 }
 .rcard.is-expanded:hover { transform: translateY(-2px); }
 
-.rcard-head {
+.rcard-primary {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
 }
 .rcard-name {
   font-family: "Fraunces", serif;
-  font-size: 22px;
-  line-height: 1.15;
+  font-size: 24px;
+  line-height: 1.1;
   letter-spacing: -0.02em;
-  flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.rcard-location {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
+}
+.loc-icon {
+  font-size: 14px;
+  filter: grayscale(0.3);
+}
+.loc-text { line-height: 1.2; }
+
+.rcard-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
 }
 .rcard-cuisine {
   display: inline-flex;
@@ -244,29 +264,18 @@ a { color: inherit; text-decoration: none; }
   text-transform: uppercase;
   letter-spacing: 0.06em;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 .rcard-cuisine-emoji {
   font-size: 13px;
   filter: grayscale(0.1);
 }
-
-.rcard-meta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
+.since-tag {
+  font-size: 11px;
   color: var(--ink-faint);
-}
-.rcard-meta .nbhd::before {
-  content: "📍";
-  margin-right: 4px;
-  filter: grayscale(0.3);
-}
-.dot-sep::before {
-  content: "·";
-  margin: 0 6px;
-  color: var(--ink-faint);
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 .rcard-blurb {
