@@ -114,9 +114,15 @@ export const dbApi = {
   setRestaurantsMentioned(id, jsonStr) {
     return updateRestaurantsStmt.run({ id, restaurants_mentioned: jsonStr }).changes;
   },
-  needsEnrichment() {
+  needsEnrichment({ includeEmpty = false } = {}) {
+    const where = includeEmpty
+      // "Empty" here means NULL OR the JSON literal "[]" — the latter is
+      // what a prior extraction pass wrote when it found (or errored into)
+      // no restaurants. Useful when re-running after a bug fix.
+      ? `is_hidden = 0 AND (restaurants_mentioned IS NULL OR restaurants_mentioned = '[]')`
+      : `is_hidden = 0 AND restaurants_mentioned IS NULL`;
     return db.prepare(
-      `SELECT id, url, title FROM openings WHERE is_hidden = 0 AND restaurants_mentioned IS NULL`
+      `SELECT id, url, title FROM openings WHERE ${where}`
     ).all();
   },
   list({ source = null, status = null, limit = 50, offset = 0, cutoff } = {}) {

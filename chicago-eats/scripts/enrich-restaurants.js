@@ -13,9 +13,16 @@ function titleFor(row) {
   return row.title || "";
 }
 
-const rows = dbApi.needsEnrichment();
+// REENRICH_EMPTY=1 also re-processes rows whose previous extraction produced
+// an empty list — useful after fixing a bug that made the extractor silently
+// fail (e.g. missing SDK, bad API key). Default: only touch NULL rows so we
+// don't spend API calls re-checking articles that legitimately have no
+// restaurants to extract.
+const includeEmpty = process.env.REENRICH_EMPTY === "1";
+const rows = dbApi.needsEnrichment({ includeEmpty });
 const mode = process.env.EXTRACTOR === "llm" && process.env.ANTHROPIC_API_KEY ? "llm" : "regex";
-console.log(`enrich-restaurants: ${rows.length} row${rows.length === 1 ? "" : "s"} to enrich (mode: ${mode})`);
+const scope = includeEmpty ? "NULL + empty" : "NULL only";
+console.log(`enrich-restaurants: ${rows.length} row${rows.length === 1 ? "" : "s"} to enrich (mode: ${mode}, scope: ${scope})`);
 
 // LLM extraction is slower and rate-limited — halve concurrency for that path.
 const CONCURRENCY = mode === "llm" ? 2 : 4;
