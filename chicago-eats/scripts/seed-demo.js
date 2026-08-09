@@ -1,0 +1,150 @@
+// Populates the DB with clearly-labeled sample openings so the UI has
+// content when the live RSS feeds aren't reachable (e.g. in sandboxes
+// with restricted egress). Safe to run more than once — rows dedupe on URL.
+
+import { dbApi } from "../db.js";
+import { stableId } from "../sources/util.js";
+
+const SAMPLES = [
+  {
+    source: "demo-eater",
+    source_label: "Eater Chicago (demo)",
+    url: "https://chicago.eater.com/demo/1",
+    title: "New Fulton Market wine bar debuts with an all-natural list and small plates",
+    restaurant: "Cellar & Co.",
+    neighborhood: "Fulton Market",
+    status: "opening",
+    summary: "A cozy 40-seat wine bar with a rotating list of small-producer bottles and a snack-driven menu opened this week in Fulton Market.",
+    image_url: null,
+    daysAgo: 1,
+  },
+  {
+    source: "demo-eater",
+    source_label: "Eater Chicago (demo)",
+    url: "https://chicago.eater.com/demo/2",
+    title: "Buzzy Tokyo ramen chain opens its first US shop in West Loop",
+    restaurant: "Menya Mori",
+    neighborhood: "West Loop",
+    status: "opening",
+    summary: "The counter-only shop specializes in tonkotsu with a 20-hour broth and hand-cut noodles from an on-site machine.",
+    image_url: null,
+    daysAgo: 3,
+  },
+  {
+    source: "demo-blockclub",
+    source_label: "Block Club Chicago (demo)",
+    url: "https://blockclubchicago.org/demo/1",
+    title: "Logan Square bakery from ex-Lula pastry chef is coming this fall",
+    restaurant: "Little Loaf",
+    neighborhood: "Logan Square",
+    status: "upcoming",
+    summary: "Sourdough, laminated pastries, and a rotating single-origin drip program are planned for the Milwaukee Avenue storefront.",
+    image_url: null,
+    daysAgo: 4,
+  },
+  {
+    source: "demo-blockclub",
+    source_label: "Block Club Chicago (demo)",
+    url: "https://blockclubchicago.org/demo/2",
+    title: "Pilsen taqueria launches expanded brunch menu — now open on weekends",
+    restaurant: "Taqueria Corazón",
+    neighborhood: "Pilsen",
+    status: "opening",
+    summary: "Chilaquiles, birria breakfast tacos, and a mezcal-forward micheladas menu land Saturdays and Sundays 10am–2pm.",
+    image_url: null,
+    daysAgo: 6,
+  },
+  {
+    source: "demo-reddit",
+    source_label: "r/chicagofood (demo)",
+    url: "https://reddit.com/r/chicagofood/demo/1",
+    title: "New Avondale pizzeria opens with a coal-fired oven",
+    restaurant: null,
+    neighborhood: "Avondale",
+    status: "opening",
+    summary: "Neighbors flagged this in the sub — 12 seats, cash only, opening night Thursday. Owner is ex-Pequod's.",
+    image_url: null,
+    daysAgo: 2,
+  },
+  {
+    source: "demo-eater",
+    source_label: "Eater Chicago (demo)",
+    url: "https://chicago.eater.com/demo/3",
+    title: "Michelin-starred chef's casual concept set to open in River North",
+    restaurant: "Ora",
+    neighborhood: "River North",
+    status: "upcoming",
+    summary: "The all-day cafe will focus on Levantine breakfast and a lunchtime mezze counter, with dinner service phasing in later.",
+    image_url: null,
+    daysAgo: 8,
+  },
+  {
+    source: "demo-blockclub",
+    source_label: "Block Club Chicago (demo)",
+    url: "https://blockclubchicago.org/demo/3",
+    title: "Wicker Park coffee shop debuts second location in Ukrainian Village",
+    restaurant: "Middlebrow",
+    neighborhood: "Ukrainian Village",
+    status: "opening",
+    summary: "The bakery-forward second shop leans harder into bread program and adds a small evening natural-wine hour.",
+    image_url: null,
+    daysAgo: 10,
+  },
+  {
+    source: "demo-reddit",
+    source_label: "r/chicagofood (demo)",
+    url: "https://reddit.com/r/chicagofood/demo/2",
+    title: "Hyde Park Thai place quietly opened last week and it's excellent",
+    restaurant: null,
+    neighborhood: "Hyde Park",
+    status: "opening",
+    summary: "Reddit thread: crispy pork belly kaprao and khao soi are the picks. Small dining room, mostly takeout for now.",
+    image_url: null,
+    daysAgo: 5,
+  },
+  {
+    source: "demo-eater",
+    source_label: "Eater Chicago (demo)",
+    url: "https://chicago.eater.com/demo/4",
+    title: "Andersonville's newest bar and grill opens with an all-day sandwich menu",
+    restaurant: "The Grove",
+    neighborhood: "Andersonville",
+    status: "opening",
+    summary: "Housed in a former hardware store, the 90-seat spot leans on wood-fired sandwiches and a short cocktail list.",
+    image_url: null,
+    daysAgo: 12,
+  },
+  {
+    source: "demo-blockclub",
+    source_label: "Block Club Chicago (demo)",
+    url: "https://blockclubchicago.org/demo/4",
+    title: "Bucktown ice cream shop debuts with rotating seasonal flavors",
+    restaurant: "Ora Gelato",
+    neighborhood: "Bucktown",
+    status: "opening",
+    summary: "Fig-honey, olive oil, and burnt basque cheesecake gelato are among the openers at the tiny Damen Avenue storefront.",
+    image_url: null,
+    daysAgo: 14,
+  },
+];
+
+const rows = SAMPLES.map((s) => {
+  const publishedAt = new Date(Date.now() - s.daysAgo * 86400000).toISOString();
+  return {
+    id: stableId(s.source, s.url),
+    source: s.source,
+    source_label: s.source_label,
+    url: s.url,
+    title: s.title,
+    restaurant: s.restaurant,
+    neighborhood: s.neighborhood,
+    status: s.status,
+    summary: s.summary,
+    image_url: s.image_url,
+    published_at: publishedAt,
+  };
+});
+
+const inserted = dbApi.insertMany(rows);
+console.log(`seed-demo: inserted ${inserted} new (of ${rows.length} sample rows)`);
+process.exit(0);
