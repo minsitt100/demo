@@ -1,12 +1,10 @@
 // ---------- state ----------
 const state = {
-  status: "",
-  source: "",
-  limit: 25,
-  offset: 0,
-  total: 0,
-  items: [],
-  sources: [],
+  cuisine: "",
+  maxAgeDays: null,
+  restaurants: [],
+  cuisines: [],
+  expanded: new Set(),
 };
 
 // ---------- helpers ----------
@@ -28,39 +26,32 @@ function relativeTime(iso) {
   if (diff < 3600)    return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400)   return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 604800)  return `${Math.floor(diff / 86400)}d ago`;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  if (diff < 2592000) return `${Math.floor(diff / 604800)}w ago`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function isFresh(iso) {
-  if (!iso) return false;
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  return diff < 60 * 60 * 24 * 3; // 3 days
+function shortDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-// Restaurant names extracted from the article body — shown as a chip row
-// so the user can see the specific places without clicking through.
-function renderMentionedChips(item) {
-  let list = [];
-  try {
-    list = item.restaurants_mentioned ? JSON.parse(item.restaurants_mentioned) : [];
-  } catch { list = []; }
-  // Drop the guessed restaurant if it's already the same as the card
-  // title's restaurant (avoid dupes).
-  if (item.restaurant) {
-    const r = item.restaurant.toLowerCase();
-    list = list.filter((x) => x.name.toLowerCase() !== r);
-  }
-  if (!list.length) return "";
-  return `
-    <div class="mentioned">
-      <span class="mentioned-label">Restaurants:</span>
-      <span class="mentioned-chips">
-        ${list.slice(0, 8).map((r) => `<span class="mchip">${escapeHtml(r.name)}</span>`).join("")}
-        ${list.length > 8 ? `<span class="mchip mchip-more">+${list.length - 8} more</span>` : ""}
-      </span>
-    </div>
-  `;
-}
+const CUISINE_EMOJI = {
+  "Ramen":"🍜","Sushi":"🍣","Japanese":"🍱","Yakitori":"🍢","Izakaya":"🏮",
+  "Thai":"🌶️","Vietnamese":"🍲","Italian":"🍝","Pizza":"🍕","Mexican":"🌮",
+  "Tacos":"🌮","Korean":"🥘","Korean BBQ":"🥩","Chinese":"🥟","Dim Sum":"🥟",
+  "French":"🥖","Café":"☕","Coffee":"☕","Bakery":"🥐","Gelato":"🍨",
+  "Ice Cream":"🍦","Wine Bar":"🍷","Cocktails":"🍸","Cocktail Bar":"🍸",
+  "Brewery":"🍺","Pub":"🍺","Gastropub":"🍺","Steakhouse":"🥩",
+  "Seafood":"🦪","Sandwiches":"🥪","Burgers":"🍔","Deli":"🥪","Diner":"🍳",
+  "Mediterranean":"🫒","Greek":"🫒","Levantine":"🥙","Lebanese":"🥙",
+  "Israeli":"🥙","Middle Eastern":"🥙","Spanish":"🥘","Indian":"🍛",
+  "Ethiopian":"🍛","Peruvian":"🥘","Cuban":"🥘","Caribbean":"🌴",
+  "Southern":"🍗","BBQ":"🍖","Fried Chicken":"🍗","Hot Dogs":"🌭",
+  "Vegetarian":"🥗","Vegan":"🌱","American":"🍽","New American":"🍽",
+  "Asian Fusion":"🍽",
+};
 
 function toast(msg) {
   const t = $("#toast");
@@ -78,92 +69,117 @@ async function api(path, opts = {}) {
 }
 
 // ---------- rendering ----------
-function renderFeed(replace = true) {
-  const feed = $("#feed");
-  if (replace) feed.innerHTML = "";
+function currentFiltered() {
+  const list = state.restaurants;
+  if (!state.cuisine) return list;
+  return list.filter((r) => r.cuisine === state.cuisine);
+}
 
-  if (!state.items.length && replace) {
-    feed.innerHTML = `
+function renderGrid() {
+  const grid = $("#rgrid");
+  const items = currentFiltered();
+
+  if (!items.length) {
+    grid.innerHTML = `
       <div class="empty">
-        <h3>Nothing here yet.</h3>
-        <p>Try hitting <strong>Refresh</strong> to pull the latest from every source.</p>
+        <h3>No restaurants yet.</h3>
+        <p>Hit <strong>Refresh</strong> to pull the latest, or drop the cuisine filter.</p>
       </div>
     `;
     return;
   }
 
-  const slice = replace ? state.items : state.items.slice(state.items.length - state.limit);
-  for (const item of slice) {
-    feed.appendChild(renderCard(item));
+  grid.innerHTML = "";
+  for (const r of items) {
+    grid.appendChild(renderCard(r));
   }
 }
 
-function renderCard(item) {
-  const el = document.createElement("article");
-  el.className = "card" + (item.image_url ? "" : " no-image");
-  el.dataset.id = item.id;
+function cuisineChip(cuisine) {
+  if (!cuisine) return "";
+  const emoji = CUISINE_EMOJI[cuisine] || "🍽";
+  return `<span class="rcard-cuisine"><span class="rcard-cuisine-emoji" aria-hidden="true">${emoji}</span>${escapeHtml(cuisine)}</span>`;
+}
 
-  const statusBadge =
-    item.status === "upcoming"
-      ? `<span class="badge upcoming">Coming soon</span>`
-      : `<span class="badge now">Now open</span>`;
-  const freshBadge = isFresh(item.published_at) ? `<span class="badge new">New</span>` : "";
+function renderCard(r) {
+  const el = document.createElement("article");
+  const id = r.name.toLowerCase();
+  const isExpanded = state.expanded.has(id);
+  el.className = "rcard" + (isExpanded ? " is-expanded" : "");
+  el.dataset.id = id;
+
+  const nbhd = r.neighborhoods.length
+    ? r.neighborhoods.slice(0, 2).join(" · ")
+    : "Chicago";
 
   el.innerHTML = `
-    ${item.image_url ? `
-      <a class="card-thumb" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">
-        <img loading="lazy" src="${escapeHtml(item.image_url)}" alt="" onerror="this.parentElement.remove(); this.closest('.card').classList.add('no-image');" />
-      </a>` : ""}
-    <div class="card-body">
-      <div class="card-meta">
-        ${statusBadge}
-        ${freshBadge}
-        <span class="source-pill">${escapeHtml(item.source_label)}</span>
-        <span class="dot-sep">${escapeHtml(relativeTime(item.published_at || item.seen_at))}</span>
-      </div>
-      ${item.restaurant ? `<div class="card-restaurant">${escapeHtml(item.restaurant)}</div>` : ""}
-      <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">
-        <h3 class="card-title">${escapeHtml(item.title)}</h3>
-      </a>
-      ${item.summary ? `<p class="card-summary">${escapeHtml(item.summary)}</p>` : ""}
-      ${renderMentionedChips(item)}
-      <div class="card-actions">
-        <span class="neighborhood">${item.neighborhood ? escapeHtml(item.neighborhood) : "Chicago"}</span>
-        <button class="icon-btn" title="Hide from feed" aria-label="Hide" data-hide="${item.id}">✕</button>
-      </div>
+    <header class="rcard-head">
+      <h3 class="rcard-name">${escapeHtml(r.name)}</h3>
+      ${cuisineChip(r.cuisine)}
+    </header>
+    <div class="rcard-meta">
+      <span class="nbhd">${escapeHtml(nbhd)}</span>
+      ${r.firstSeen ? `<span class="dot-sep">Since ${shortDate(r.firstSeen)}</span>` : ""}
+    </div>
+    ${r.blurb ? `<p class="rcard-blurb">${escapeHtml(r.blurb)}</p>` : `<p class="rcard-blurb rcard-blurb-empty">—</p>`}
+    <footer class="rcard-foot">
+      <span class="mention-count">${r.mentions} source${r.mentions === 1 ? "" : "s"}</span>
+      <button class="rcard-toggle" data-toggle="${id}">
+        ${isExpanded ? "Hide sources" : "Show sources"}
+        <span class="chev" aria-hidden="true">${isExpanded ? "▴" : "▾"}</span>
+      </button>
+    </footer>
+    <div class="rcard-expanded" ${isExpanded ? "" : "hidden"}>
+      <h4 class="expanded-title">Referenced in</h4>
+      <ul class="source-list">
+        ${r.sources.map((s) => `
+          <li>
+            <a href="${escapeHtml(s.url)}" target="_blank" rel="noreferrer">
+              <span class="src-label">${escapeHtml(s.source_label)}</span>
+              <span class="src-title">${escapeHtml(s.title)}</span>
+              <span class="src-date">${shortDate(s.published_at)}</span>
+            </a>
+          </li>
+        `).join("")}
+      </ul>
     </div>
   `;
 
-  el.querySelector("[data-hide]")?.addEventListener("click", async (e) => {
+  el.querySelector(".rcard-toggle")?.addEventListener("click", (e) => {
     e.stopPropagation();
-    await hide(item.id);
-    el.style.transition = "opacity 200ms, transform 200ms";
-    el.style.opacity = "0";
-    el.style.transform = "translateX(20px)";
-    setTimeout(() => el.remove(), 200);
+    toggleExpanded(id);
   });
+  el.addEventListener("click", () => toggleExpanded(id));
   return el;
 }
 
-function renderCounts() {
-  const window = state.maxAgeDays ? ` · past ${state.maxAgeDays} days` : "";
-  $("#counts").textContent =
-    `${state.total} opening${state.total === 1 ? "" : "s"} tracked${window}`;
+function toggleExpanded(id) {
+  if (state.expanded.has(id)) state.expanded.delete(id);
+  else state.expanded.add(id);
+  renderGrid();
 }
 
-function renderSourceFilters() {
-  const wrap = $("#source-filters");
+function renderCounts() {
+  const total = currentFiltered().length;
+  const window = state.maxAgeDays ? ` · past ${state.maxAgeDays} days` : "";
+  $("#counts").textContent =
+    `${total} restaurant${total === 1 ? "" : "s"}${window}`;
+}
+
+function renderCuisineFilters() {
+  const wrap = $("#cuisine-filters");
+  const cuisines = state.cuisines;
   wrap.innerHTML =
-    `<button class="chip is-active" data-source="">All sources</button>` +
-    state.sources
-      .map((s) => `<button class="chip" data-source="${escapeHtml(s.id)}">${escapeHtml(s.label)}</button>`)
-      .join("");
+    `<button class="chip is-active" data-cuisine="">All cuisines</button>` +
+    cuisines.map((c) =>
+      `<button class="chip" data-cuisine="${escapeHtml(c)}">${(CUISINE_EMOJI[c] || "")} ${escapeHtml(c)}</button>`
+    ).join("");
   $$(".chip", wrap).forEach((btn) => {
     btn.addEventListener("click", () => {
-      state.source = btn.dataset.source;
+      state.cuisine = btn.dataset.cuisine;
       $$(".chip", wrap).forEach((b) => b.classList.toggle("is-active", b === btn));
-      state.offset = 0;
-      loadFeed(true);
+      renderGrid();
+      renderCounts();
     });
   });
 }
@@ -180,14 +196,10 @@ function renderSourceStatus(runs) {
   }
   list.innerHTML = [...latestBySource.values()].map((r) => {
     const cls = r.error ? "err" : "ok";
-    const label = state.sources.find((s) => s.id === r.source)?.label || r.source;
     const detail = r.error
       ? `error: ${escapeHtml(r.error.slice(0, 40))}`
       : `+${r.inserted} new (${r.fetched} scanned)`;
-    return `<li>
-      <span>${escapeHtml(label)}</span>
-      <span class="${cls}">${detail}</span>
-    </li>`;
+    return `<li><span>${escapeHtml(r.source)}</span><span class="${cls}">${detail}</span></li>`;
   }).join("");
 }
 
@@ -195,11 +207,7 @@ function renderSourceStatus(runs) {
 async function loadStatus() {
   try {
     const s = await api("/api/status");
-    state.sources = s.sources || [];
-    state.total = s.total || 0;
     state.maxAgeDays = s.maxAgeDays || null;
-    renderSourceFilters();
-    renderCounts();
     renderSourceStatus(s.recentRuns);
     if (s.recentRuns?.[0]?.finished_at) {
       $("#last-updated").textContent = "Updated " + relativeTime(s.recentRuns[0].finished_at);
@@ -209,54 +217,34 @@ async function loadStatus() {
   }
 }
 
-async function loadFeed(replace = true) {
-  const feed = $("#feed");
-  if (replace) {
-    feed.innerHTML = `<div class="loading">Loading openings…</div>`;
-  }
-  const qs = new URLSearchParams({
-    limit: state.limit,
-    offset: state.offset,
-    ...(state.status ? { status: state.status } : {}),
-    ...(state.source ? { source: state.source } : {}),
-  });
+async function loadRestaurants() {
+  const grid = $("#rgrid");
+  grid.innerHTML = `<div class="loading">Loading restaurants…</div>`;
   try {
-    const res = await api(`/api/openings?${qs}`);
-    state.total = res.total;
-    if (res.maxAgeDays) state.maxAgeDays = res.maxAgeDays;
-    if (replace) state.items = res.items;
-    else state.items = state.items.concat(res.items);
-    renderFeed(replace);
+    const res = await api("/api/restaurants");
+    state.restaurants = res.restaurants || [];
+    state.maxAgeDays = res.maxAgeDays || state.maxAgeDays;
+    // Collect unique cuisines for filter chips.
+    const cuisineSet = new Set();
+    for (const r of state.restaurants) if (r.cuisine) cuisineSet.add(r.cuisine);
+    state.cuisines = [...cuisineSet].sort();
+    renderCuisineFilters();
+    renderGrid();
     renderCounts();
-    $("#load-more").hidden = state.items.length >= state.total;
   } catch (e) {
-    feed.innerHTML = `<div class="empty"><h3>Couldn't load the feed.</h3><p>${escapeHtml(e.message)}</p></div>`;
+    grid.innerHTML = `<div class="empty"><h3>Couldn't load restaurants.</h3><p>${escapeHtml(e.message)}</p></div>`;
   }
-}
-
-async function hide(id) {
-  try { await api(`/api/openings/${id}/hide`, { method: "POST" }); } catch (e) { console.warn(e); }
 }
 
 // ---------- events ----------
-$$('.filter-group [data-status]').forEach((btn) => {
-  btn.addEventListener("click", () => {
-    state.status = btn.dataset.status;
-    $$('.filter-group [data-status]').forEach((b) => b.classList.toggle("is-active", b === btn));
-    state.offset = 0;
-    loadFeed(true);
-  });
-});
-
 $("#refresh-btn").addEventListener("click", async () => {
   const btn = $("#refresh-btn");
   btn.classList.add("is-loading");
   btn.disabled = true;
   try {
     const res = await api("/api/refresh", { method: "POST" });
-    toast(res.inserted ? `+${res.inserted} new` : "Up to date");
-    state.offset = 0;
-    await loadFeed(true);
+    toast(res.inserted ? `+${res.inserted} new article${res.inserted === 1 ? "" : "s"}` : "Up to date");
+    await loadRestaurants();
     await loadStatus();
   } catch (e) {
     toast("Refresh failed");
@@ -267,13 +255,8 @@ $("#refresh-btn").addEventListener("click", async () => {
   }
 });
 
-$("#load-more").addEventListener("click", async () => {
-  state.offset += state.limit;
-  await loadFeed(false);
-});
-
 // ---------- boot ----------
 (async () => {
   await loadStatus();
-  await loadFeed(true);
+  await loadRestaurants();
 })();

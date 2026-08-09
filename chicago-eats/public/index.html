@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Chicago Eats — new restaurant openings</title>
+    <title>Chicago Eats — new restaurants</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,7 +19,7 @@
           <span class="dot" aria-hidden="true"></span>
           <div>
             <h1>Chicago Eats</h1>
-            <p class="tagline">New restaurant openings, aggregated from the sources you trust.</p>
+            <p class="tagline">New restaurants, aggregated from the sources you trust.</p>
           </div>
         </div>
         <div class="header-actions">
@@ -35,23 +35,14 @@
     <main class="container">
       <section class="filter-bar">
         <div class="filters">
-          <div class="filter-group" role="tablist" aria-label="Status">
-            <button class="chip is-active" data-status="">All</button>
-            <button class="chip" data-status="opening">Now open</button>
-            <button class="chip" data-status="upcoming">Coming soon</button>
-          </div>
-          <div class="filter-group" id="source-filters">
-            <!-- source chips injected -->
+          <div class="filter-group" id="cuisine-filters">
+            <button class="chip is-active" data-cuisine="">All cuisines</button>
           </div>
         </div>
         <div class="counts" id="counts">—</div>
       </section>
 
-      <section class="feed" id="feed" aria-live="polite"></section>
-
-      <div class="load-more-wrap">
-        <button class="btn primary" id="load-more" hidden>Load more</button>
-      </div>
+      <section class="rgrid" id="rgrid" aria-live="polite"></section>
 
       <section class="footer-status" id="footer-status" hidden>
         <h4>Sources</h4>

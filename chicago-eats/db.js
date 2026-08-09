@@ -122,6 +122,17 @@ export const dbApi = {
   list({ source = null, status = null, limit = 50, offset = 0, cutoff } = {}) {
     return listStmt.all({ source, status, limit, offset, cutoff });
   },
+  // Everything visible in the window — used by the restaurants aggregator.
+  listAllInWindow({ cutoff }) {
+    return db.prepare(`
+      SELECT id, source, source_label, url, title, restaurant, neighborhood,
+             status, summary, image_url, published_at, seen_at, restaurants_mentioned
+      FROM openings
+      WHERE is_hidden = 0
+        AND COALESCE(published_at, seen_at) >= @cutoff
+      ORDER BY COALESCE(published_at, seen_at) DESC
+    `).all({ cutoff });
+  },
   count({ source = null, status = null, cutoff } = {}) {
     return countStmt.get({ source, status, cutoff }).n;
   },

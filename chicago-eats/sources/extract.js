@@ -81,36 +81,142 @@ function looksLikeRestaurantName(name) {
   return true;
 }
 
+// Cuisine tags keyed off keywords we might find in the name or blurb.
+// Order matters — longer/more specific phrases first so "wine bar" wins
+// over "bar".
+const CUISINE_KEYWORDS = [
+  ["korean bbq", "Korean BBQ"],
+  ["wine bar", "Wine Bar"],
+  ["cocktail bar", "Cocktail Bar"],
+  ["natural wine", "Wine Bar"],
+  ["coffee shop", "Coffee"],
+  ["coffee bar", "Coffee"],
+  ["ice cream", "Ice Cream"],
+  ["dim sum", "Dim Sum"],
+  ["new american", "New American"],
+  ["modern american", "New American"],
+  ["farm to table", "New American"],
+  ["farm-to-table", "New American"],
+  ["middle eastern", "Middle Eastern"],
+  ["asian fusion", "Asian Fusion"],
+  ["hot dog", "Hot Dogs"],
+  ["fried chicken", "Fried Chicken"],
+  ["ramen", "Ramen"],
+  ["sushi", "Sushi"],
+  ["yakitori", "Yakitori"],
+  ["izakaya", "Izakaya"],
+  ["japanese", "Japanese"],
+  ["thai", "Thai"],
+  ["vietnamese", "Vietnamese"],
+  ["pho", "Vietnamese"],
+  ["italian", "Italian"],
+  ["pizza", "Pizza"],
+  ["pizzeria", "Pizza"],
+  ["pasta", "Italian"],
+  ["mexican", "Mexican"],
+  ["tacos", "Tacos"],
+  ["taqueria", "Tacos"],
+  ["korean", "Korean"],
+  ["chinese", "Chinese"],
+  ["cantonese", "Chinese"],
+  ["french", "French"],
+  ["bistro", "French"],
+  ["brasserie", "French"],
+  ["patisserie", "Bakery"],
+  ["boulangerie", "Bakery"],
+  ["bakery", "Bakery"],
+  ["cafe", "Café"],
+  ["café", "Café"],
+  ["brewery", "Brewery"],
+  ["gastropub", "Gastropub"],
+  ["steakhouse", "Steakhouse"],
+  ["seafood", "Seafood"],
+  ["oyster", "Seafood"],
+  ["gelato", "Gelato"],
+  ["sandwich", "Sandwiches"],
+  ["burger", "Burgers"],
+  ["deli", "Deli"],
+  ["diner", "Diner"],
+  ["mediterranean", "Mediterranean"],
+  ["greek", "Greek"],
+  ["levantine", "Levantine"],
+  ["lebanese", "Lebanese"],
+  ["israeli", "Israeli"],
+  ["tapas", "Spanish"],
+  ["spanish", "Spanish"],
+  ["indian", "Indian"],
+  ["ethiopian", "Ethiopian"],
+  ["peruvian", "Peruvian"],
+  ["cuban", "Cuban"],
+  ["caribbean", "Caribbean"],
+  ["southern", "Southern"],
+  ["barbecue", "BBQ"],
+  ["bbq", "BBQ"],
+  ["vegetarian", "Vegetarian"],
+  ["vegan", "Vegan"],
+  ["pub", "Pub"],
+  ["cocktail", "Cocktails"],
+  ["american", "American"],
+];
+
+export function guessCuisine(text) {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  for (const [needle, label] of CUISINE_KEYWORDS) {
+    const re = new RegExp(`(^|[^a-z])${needle}([^a-z]|$)`);
+    if (re.test(lower)) return label;
+  }
+  return null;
+}
+
+// Grab the first sentence-ish chunk from a blob of prose. Prefers a full
+// sentence 20–200 chars; falls back to a 200-char truncation.
+export function firstSentence(text) {
+  if (!text) return "";
+  const clean = text.replace(/\s+/g, " ").trim();
+  const m = clean.match(/^(.{20,220}?[.!?])(\s|$)/);
+  if (m) return m[1];
+  if (clean.length <= 220) return clean;
+  return clean.slice(0, 220).replace(/\s+\S*$/, "") + "…";
+}
+
 export function extractRestaurants(html) {
   if (!html) return [];
   const body = findBody(html);
-  const scores = new Map(); // lowercased name -> { name, score }
+  const found = new Map(); // lowercased name -> { name, cuisine, blurb, score }
 
-  function add(rawText, score) {
-    const clean = stripHtml(rawText).replace(/\s+/g, " ").trim()
-      // Trailing "— Address" or "· Neighborhood" tails on headers
+  function add(rawName, score, blurbSource = "") {
+    const clean = stripHtml(rawName).replace(/\s+/g, " ").trim()
       .replace(/\s*[—–·|]\s*.*$/, "");
     if (!looksLikeRestaurantName(clean)) return;
     const key = clean.toLowerCase();
-    const existing = scores.get(key);
-    if (existing) existing.score += score;
-    else scores.set(key, { name: clean, score });
+    const blurb = firstSentence(stripHtml(blurbSource));
+    const cuisine = guessCuisine(`${clean} ${blurb}`);
+    const existing = found.get(key);
+    if (existing) {
+      existing.score += score;
+      if (!existing.blurb && blurb) existing.blurb = blurb;
+      if (!existing.cuisine && cuisine) existing.cuisine = cuisine;
+    } else {
+      found.set(key, { name: clean, cuisine, blurb, score });
+    }
   }
 
-  // <h2> / <h3> — the primary signal for roundup pieces.
+  // <h2> / <h3> block + the content up to the next header — roundups
+  // typically follow "one header + one paragraph" per restaurant.
   let m;
-  const hxRe = /<h[23][^>]*>([\s\S]*?)<\/h[23]>/gi;
-  while ((m = hxRe.exec(body)) !== null) add(m[1], 3);
+  const hxRe = /<h[23][^>]*>([\s\S]*?)<\/h[23]>([\s\S]*?)(?=<h[23]|<\/article|$)/gi;
+  while ((m = hxRe.exec(body)) !== null) add(m[1], 3, m[2]);
 
-  // <p><strong>Name</strong> — the "leaded paragraph" roundup pattern
-  // used by many food outlets when they don't use full section headers.
-  const strongRe = /<p[^>]*>\s*(?:<(?:span|em|a)[^>]*>\s*)*<(?:strong|b)[^>]*>([\s\S]*?)<\/(?:strong|b)>/gi;
-  while ((m = strongRe.exec(body)) !== null) add(m[1], 2);
+  // <p><strong>Name</strong> rest-of-paragraph — the leaded-paragraph
+  // roundup pattern used by many outlets when they skip section headers.
+  const strongRe = /<p[^>]*>\s*(?:<(?:span|em|a)[^>]*>\s*)*<(?:strong|b)[^>]*>([\s\S]*?)<\/(?:strong|b)>([\s\S]*?)<\/p>/gi;
+  while ((m = strongRe.exec(body)) !== null) add(m[1], 2, m[2]);
 
-  return [...scores.values()]
+  return [...found.values()]
     .sort((a, b) => b.score - a.score)
     .slice(0, 12)
-    .map(({ name }) => ({ name }));
+    .map(({ name, cuisine, blurb }) => ({ name, cuisine, blurb }));
 }
 
 // Fetch an article and pull restaurant names out of it. Returns [] on any

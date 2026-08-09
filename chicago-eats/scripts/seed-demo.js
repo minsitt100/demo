@@ -4,6 +4,7 @@
 
 import { dbApi } from "../db.js";
 import { stableId } from "../sources/util.js";
+import { guessCuisine } from "../sources/extract.js";
 
 const SAMPLES = [
   {
@@ -130,6 +131,14 @@ const SAMPLES = [
 
 const rows = SAMPLES.map((s) => {
   const publishedAt = new Date(Date.now() - s.daysAgo * 86400000).toISOString();
+  // Seed restaurants_mentioned so the demo cards show cuisine + blurb.
+  const mentioned = s.restaurant
+    ? [{
+        name: s.restaurant,
+        cuisine: guessCuisine(`${s.restaurant} ${s.title} ${s.summary}`),
+        blurb: s.summary,
+      }]
+    : [];
   return {
     id: stableId(s.source, s.url),
     source: s.source,
@@ -142,6 +151,7 @@ const rows = SAMPLES.map((s) => {
     summary: s.summary,
     image_url: s.image_url,
     published_at: publishedAt,
+    restaurants_mentioned: JSON.stringify(mentioned),
   };
 });
 
