@@ -9,7 +9,8 @@
     "start": "node server.js",
     "scrape": "node -e \"import('./scraper.js').then(m => m.runAllSources().then(n => { console.log('done:', n, 'new'); process.exit(0); }))\"",
     "seed:demo": "node scripts/seed-demo.js",
-    "verify:urls": "node scripts/verify-urls.js"
+    "verify:urls": "node scripts/verify-urls.js",
+    "peek:feed": "node scripts/peek-feed.js"
   },
   "engines": {
     "node": ">=18"

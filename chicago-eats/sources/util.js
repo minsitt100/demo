@@ -2,7 +2,10 @@
 
 import crypto from "crypto";
 
-// Words that suggest an article is about a NEW opening (or upcoming opening).
+// Words that suggest an article is about a NEW opening, an upcoming opening,
+// or a discovery-friendly roundup of new places. The goal is high recall —
+// it's easier for a user to hide a card they don't want than to know an
+// opening was silently dropped.
 const OPENING_PATTERNS = [
   /\bopens?\b/i,
   /\bopening\b/i,
@@ -18,6 +21,14 @@ const OPENING_PATTERNS = [
   /\bfirst look\b/i,
   /\bset to open\b/i,
   /\bwill open\b/i,
+  /\barriv(?:es|ed|ing|al)\b/i,
+  /\breopens?\b/i,
+  /\breopened\b/i,
+  /\bwelcomes?\b/i,
+  /\bexpand(?:s|ing) to\b/i,
+  /\blatest (?:restaurant|opening|spot|addition|concept|venture|hotspot)\b/i,
+  /\bnew (?:restaurant|spot|hotspot|joint|eatery|bar|cafe|café|bakery|shop|counter|pop-?up|concept|opening)s?\b/i,
+  /\bbring(?:s|ing) .{0,60}\bto\s+(?:chicago|the\s+\w+|west\s+loop|wicker\s+park|logan\s+square|pilsen|river\s+north|hyde\s+park|lincoln\s+park|fulton\s+market|avondale)\b/i,
 ];
 
 const UPCOMING_PATTERNS = [
@@ -26,22 +37,36 @@ const UPCOMING_PATTERNS = [
   /\bset to open\b/i,
   /\bopening (?:this|next|in)\b/i,
   /\bdebuting (?:this|next|in)\b/i,
+  /\bexpand(?:s|ing) to\b/i,
 ];
 
-// Words that push us to skip (recaps, closings, etc.)
+// Words that push us to skip — kept intentionally short so discovery
+// roundups (e.g. "The Best New Chicago Openings This Fall") still show.
+// "roundup" and "best of" were removed at the user's request.
 const SKIP_PATTERNS = [
   /\bcloses?\b/i,
   /\bclosing\b/i,
   /\bshuttered?\b/i,
+  /\bshutting\b/i,
   /\brecipe\b/i,
-  /\bround-?up\b/i,
-  /\bbest of\b/i,
+  /\bobituary\b/i,
 ];
 
+// Returns { kept, reason } so debugging tools can show why an item was
+// dropped. `looksLikeOpening` stays as a boolean wrapper.
+export function classifyItem(text) {
+  if (!text) return { kept: false, reason: "empty text" };
+  for (const r of SKIP_PATTERNS) {
+    if (r.test(text)) return { kept: false, reason: `skip: matched ${r}` };
+  }
+  for (const r of OPENING_PATTERNS) {
+    if (r.test(text)) return { kept: true, reason: `open: matched ${r}` };
+  }
+  return { kept: false, reason: "no opening keyword" };
+}
+
 export function looksLikeOpening(text) {
-  if (!text) return false;
-  if (SKIP_PATTERNS.some((r) => r.test(text))) return false;
-  return OPENING_PATTERNS.some((r) => r.test(text));
+  return classifyItem(text).kept;
 }
 
 export function classifyStatus(text) {
