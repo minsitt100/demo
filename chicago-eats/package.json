@@ -11,7 +11,8 @@
     "seed:demo": "node scripts/seed-demo.js",
     "verify:urls": "node scripts/verify-urls.js",
     "enrich:restaurants": "node scripts/enrich-restaurants.js",
-    "peek:feed": "node scripts/peek-feed.js"
+    "peek:feed": "node scripts/peek-feed.js",
+    "debug:extract": "node scripts/debug-extract.js"
   },
   "engines": {
     "node": ">=18"

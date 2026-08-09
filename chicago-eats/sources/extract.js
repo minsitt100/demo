@@ -225,8 +225,11 @@ export function extractRestaurants(html) {
 const USE_LLM =
   process.env.EXTRACTOR === "llm" && !!process.env.ANTHROPIC_API_KEY;
 
+const DEBUG = process.env.DEBUG_EXTRACT === "1";
+
 // Fetch an article and pull restaurant names out of it. Returns [] on any
 // failure — extraction is best-effort and should never break a scrape.
+// Set DEBUG_EXTRACT=1 to log the exact failure reason to stderr.
 export async function fetchAndExtract(url, { timeoutMs = 12000, title = "" } = {}) {
   if (!url) return [];
   const controller = new AbortController();
@@ -242,14 +245,19 @@ export async function fetchAndExtract(url, { timeoutMs = 12000, title = "" } = {
         "Accept": "text/html,application/xhtml+xml",
       },
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      if (DEBUG) console.warn(`[extract] fetch failed ${res.status} ${url}`);
+      return [];
+    }
     const html = await res.text();
+    if (DEBUG) console.warn(`[extract] fetched ${html.length} chars from ${url}`);
     if (USE_LLM) {
       const { extractRestaurantsLLM } = await import("./extract-llm.js");
       return await extractRestaurantsLLM(html, title);
     }
     return extractRestaurants(html);
-  } catch {
+  } catch (err) {
+    if (DEBUG) console.warn(`[extract] error on ${url}: ${err.message}`);
     return [];
   } finally {
     clearTimeout(timer);

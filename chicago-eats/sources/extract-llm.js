@@ -96,7 +96,11 @@ export async function extractRestaurantsLLM(html, title = "") {
     return (parsed.restaurants || []).filter((r) => r && r.name);
   } catch (err) {
     // Never break a scrape on an extraction failure — return empty and log.
-    console.warn(`[extract-llm] ${MODEL} failed: ${err.message}`);
+    // Include status when the SDK exposes one (e.g. 401 auth, 429 rate limit,
+    // 529 overloaded) so the terminal shows the real reason.
+    const status = err?.status ?? err?.response?.status ?? "";
+    const msg = err?.message || String(err);
+    console.warn(`[extract-llm] ${MODEL} failed${status ? ` (HTTP ${status})` : ""}: ${msg}`);
     return [];
   }
 }
