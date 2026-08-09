@@ -127,16 +127,29 @@ export function extractNeighborhood(text) {
   return null;
 }
 
-// Best-effort restaurant name guess: pull the first quoted string or the
-// leading capitalized phrase from the title. Falls back to null.
+// Best-effort restaurant name guess from the article title. Deliberately
+// conservative — the LLM/HTML extractor is much better at this, and this
+// fallback runs at the front of a headline where getting the wrong span
+// yields article-title fragments like "Inside NAIA's chic" instead of "NAIA".
 export function guessRestaurant(title) {
   if (!title) return null;
   const quoted = title.match(/[""']([^"""']{2,60})[""']/);
   if (quoted) return quoted[1].trim();
+
   // "Foo Bar opens in West Loop" -> "Foo Bar"
-  const m = title.match(/^([A-Z][A-Za-z0-9&'’.\- ]{1,60}?)\s+(?:opens|opening|debuts|is coming|will open|has opened|now open|set to)/);
-  if (m) return m[1].trim();
-  return null;
+  // Constraints to filter out headline fragments:
+  //   - name must be 1–4 whitespace-separated tokens
+  //   - every token must start with uppercase / digit / & (so a headline
+  //     opener like "Inside", "A luxury", "This new" — with lowercase words
+  //     mid-name — falls through)
+  const m = title.match(
+    /^((?:[A-Z0-9&][A-Za-z0-9&'’.\-]*(?:\s+|$)){1,4})(?:opens|opening|debuts|is coming|will open|has opened|now open|set to open)\b/,
+  );
+  if (!m) return null;
+  const candidate = m[1].trim();
+  // A single "New" / "The" is a false positive on its own.
+  if (/^(new|the|a|an|inside|meet|this|these)$/i.test(candidate)) return null;
+  return candidate;
 }
 
 export function stripHtml(html) {

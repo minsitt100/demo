@@ -75,7 +75,10 @@ function looksLikeArticleTitle(name) {
   if (/^\d/.test(t)) return true;                          // "10 Best…"
   if (/\s(opens?|opening|debuts?|coming to|now open)\s/i.test(t)) return true;
   if (/\bnew\s+(restaurants?|spots?|openings?|places?)/i.test(t)) return true;
-  if (/^(where|how|why|the best|best|these)\s/i.test(t)) return true;
+  if (/^(where|how|why|the best|best|these|inside|meet|this|watch)\s/i.test(t)) return true;
+  if (/^(a|an)\s+[a-z]/.test(t)) return true;              // "A luxury steakhouse"
+  if (/\b(chic|luxury|hot new|buzzy|trendy)\b/i.test(t)) return true;   // headline-descriptor giveaways
+  if (/\bis\s*$/i.test(t)) return true;                    // "A luxury steakhouse is" (truncated)
   if ((t.match(/,/g) || []).length >= 2) return true;      // list-comma structure
   return false;
 }
@@ -84,16 +87,20 @@ function aggregateRestaurants(openings) {
   const map = new Map(); // normalized name -> aggregate
 
   for (const o of openings) {
+    // Distinguish "never attempted" (NULL) from "attempted, found nothing"
+    // (empty JSON array). If an extractor already ran and returned nothing,
+    // trust that — don't fall back to the noisy title-guess.
+    const wasProcessed = o.restaurants_mentioned !== null;
     let mentioned = [];
     try {
       mentioned = o.restaurants_mentioned ? JSON.parse(o.restaurants_mentioned) : [];
     } catch { mentioned = []; }
 
-    // Seed with the title-guessed restaurant only when (a) the LLM/regex
-    // extraction found nothing AND (b) the guess doesn't look like an
-    // article title. If we already have real extractions, don't pollute
-    // them with a noisy title-derived fallback.
-    if (o.restaurant && mentioned.length === 0 && !looksLikeArticleTitle(o.restaurant)) {
+    // Seed with the title-guessed restaurant only when (a) no extractor
+    // has processed this row yet AND (b) the guess doesn't look like an
+    // article title. Prevents the "Inside NAIA's chic" style ghost cards
+    // from surviving after the LLM already extracted the real name.
+    if (o.restaurant && !wasProcessed && !looksLikeArticleTitle(o.restaurant)) {
       mentioned = [{ name: o.restaurant }];
     }
 
