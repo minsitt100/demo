@@ -8,6 +8,7 @@ import {
   truncate,
   stableId,
   firstImageFromHtml,
+  verifyMany,
 } from "./util.js";
 
 const parser = new Parser({
@@ -58,5 +59,7 @@ export async function fetchItems() {
       published_at: item.isoDate || item.pubDate || null,
     });
   }
-  return out;
+  // Drop any items whose article URL 404s at scrape time.
+  const alive = await verifyMany(out.map((o) => o.url));
+  return out.filter((o) => alive.get(o.url));
 }

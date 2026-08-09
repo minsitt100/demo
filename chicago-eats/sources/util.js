@@ -147,3 +147,61 @@ export function firstImageFromHtml(html) {
   const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
   return m ? m[1] : null;
 }
+
+// Verify a URL actually resolves. Used to block dead links from entering the
+// DB at scrape time, and to hide rows whose links died later.
+//
+// Rules:
+//   - Follows redirects (so short-links and rewritten paths still count).
+//   - Tries HEAD first, falls back to GET if the server refuses HEAD.
+//   - Rejects only definitive "gone" responses (404, 410) and network errors.
+//   - Treats 403/429/5xx as "we can't tell — keep it", because many sites
+//     block bots from HEAD requests even on live pages.
+export async function verifyUrl(url, { timeoutMs = 8000 } = {}) {
+  if (!url) return false;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const headers = {
+    // Pretend to be a normal browser — some CDNs 404 obvious bots.
+    "User-Agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+      "(KHTML, like Gecko) Chrome/122.0 Safari/537.36 chicago-eats/0.1",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  };
+  try {
+    let res = await fetch(url, {
+      method: "HEAD",
+      redirect: "follow",
+      signal: controller.signal,
+      headers,
+    });
+    if (res.status === 405 || res.status === 501) {
+      res = await fetch(url, {
+        method: "GET",
+        redirect: "follow",
+        signal: controller.signal,
+        headers,
+      });
+    }
+    return res.status !== 404 && res.status !== 410;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Verify a list of URLs in parallel, respecting a small concurrency cap so
+// we don't hammer a single host. Returns the URLs that passed.
+export async function verifyMany(urls, { concurrency = 8, timeoutMs = 8000 } = {}) {
+  const results = new Map();
+  const queue = [...new Set(urls.filter(Boolean))];
+  async function worker() {
+    while (queue.length) {
+      const u = queue.shift();
+      results.set(u, await verifyUrl(u, { timeoutMs }));
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  return results;
+}

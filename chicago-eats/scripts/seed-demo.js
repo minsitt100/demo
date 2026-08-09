@@ -9,7 +9,7 @@ const SAMPLES = [
   {
     source: "demo-eater",
     source_label: "Eater Chicago (demo)",
-    url: "https://chicago.eater.com/demo/1",
+    url: "https://chicago.eater.com/#demo-fulton-market-wine-bar",
     title: "New Fulton Market wine bar debuts with an all-natural list and small plates",
     restaurant: "Cellar & Co.",
     neighborhood: "Fulton Market",
@@ -21,7 +21,7 @@ const SAMPLES = [
   {
     source: "demo-eater",
     source_label: "Eater Chicago (demo)",
-    url: "https://chicago.eater.com/demo/2",
+    url: "https://chicago.eater.com/#demo-west-loop-ramen",
     title: "Buzzy Tokyo ramen chain opens its first US shop in West Loop",
     restaurant: "Menya Mori",
     neighborhood: "West Loop",
@@ -33,7 +33,7 @@ const SAMPLES = [
   {
     source: "demo-blockclub",
     source_label: "Block Club Chicago (demo)",
-    url: "https://blockclubchicago.org/demo/1",
+    url: "https://blockclubchicago.org/#demo-logan-square-bakery",
     title: "Logan Square bakery from ex-Lula pastry chef is coming this fall",
     restaurant: "Little Loaf",
     neighborhood: "Logan Square",
@@ -45,7 +45,7 @@ const SAMPLES = [
   {
     source: "demo-blockclub",
     source_label: "Block Club Chicago (demo)",
-    url: "https://blockclubchicago.org/demo/2",
+    url: "https://blockclubchicago.org/#demo-pilsen-brunch",
     title: "Pilsen taqueria launches expanded brunch menu — now open on weekends",
     restaurant: "Taqueria Corazón",
     neighborhood: "Pilsen",
@@ -57,7 +57,7 @@ const SAMPLES = [
   {
     source: "demo-reddit",
     source_label: "r/chicagofood (demo)",
-    url: "https://reddit.com/r/chicagofood/demo/1",
+    url: "https://www.reddit.com/r/chicagofood/#demo-avondale-pizza",
     title: "New Avondale pizzeria opens with a coal-fired oven",
     restaurant: null,
     neighborhood: "Avondale",
@@ -69,7 +69,7 @@ const SAMPLES = [
   {
     source: "demo-eater",
     source_label: "Eater Chicago (demo)",
-    url: "https://chicago.eater.com/demo/3",
+    url: "https://chicago.eater.com/#demo-river-north-levantine",
     title: "Michelin-starred chef's casual concept set to open in River North",
     restaurant: "Ora",
     neighborhood: "River North",
@@ -81,7 +81,7 @@ const SAMPLES = [
   {
     source: "demo-blockclub",
     source_label: "Block Club Chicago (demo)",
-    url: "https://blockclubchicago.org/demo/3",
+    url: "https://blockclubchicago.org/#demo-ukrainian-village-coffee",
     title: "Wicker Park coffee shop debuts second location in Ukrainian Village",
     restaurant: "Middlebrow",
     neighborhood: "Ukrainian Village",
@@ -93,7 +93,7 @@ const SAMPLES = [
   {
     source: "demo-reddit",
     source_label: "r/chicagofood (demo)",
-    url: "https://reddit.com/r/chicagofood/demo/2",
+    url: "https://www.reddit.com/r/chicagofood/#demo-hyde-park-thai",
     title: "Hyde Park Thai place quietly opened last week and it's excellent",
     restaurant: null,
     neighborhood: "Hyde Park",
@@ -105,7 +105,7 @@ const SAMPLES = [
   {
     source: "demo-eater",
     source_label: "Eater Chicago (demo)",
-    url: "https://chicago.eater.com/demo/4",
+    url: "https://chicago.eater.com/#demo-andersonville-sandwich",
     title: "Andersonville's newest bar and grill opens with an all-day sandwich menu",
     restaurant: "The Grove",
     neighborhood: "Andersonville",
@@ -117,7 +117,7 @@ const SAMPLES = [
   {
     source: "demo-blockclub",
     source_label: "Block Club Chicago (demo)",
-    url: "https://blockclubchicago.org/demo/4",
+    url: "https://blockclubchicago.org/#demo-bucktown-gelato",
     title: "Bucktown ice cream shop debuts with rotating seasonal flavors",
     restaurant: "Ora Gelato",
     neighborhood: "Bucktown",

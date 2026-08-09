@@ -53,9 +53,23 @@ the file to reset.
 
 - `GET  /api/openings?limit=25&offset=0&status=opening&source=eater` — feed
 - `GET  /api/sources` — enabled sources
-- `GET  /api/status` — total count + recent scrape runs
+- `GET  /api/status` — total count, current age window, recent scrape runs
 - `POST /api/refresh` — kick a scrape now
+- `POST /api/verify` — re-check every visible URL and hide dead ones
 - `POST /api/openings/:id/hide` — hide from feed
+
+## Freshness controls
+
+- **Only past 3 months are shown.** The list + count queries filter to items
+  whose `published_at` (or `seen_at`, if unknown) is within `MAX_AGE_DAYS`
+  (default `90`). Override at start: `MAX_AGE_DAYS=180 npm start`.
+- **Dead links are blocked at scrape time.** Each source's `fetchItems()`
+  runs a small parallel URL-verifier (`sources/util.js → verifyMany`) that
+  HEAD-checks every candidate and drops 404/410/network-error URLs before
+  they hit the DB.
+- **Clean up existing dead links** with `npm run verify:urls` (walks all
+  un-hidden rows, hides ones that no longer resolve). Same thing over HTTP
+  via `POST /api/verify`.
 
 ## Adding a source
 

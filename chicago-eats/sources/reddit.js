@@ -7,6 +7,7 @@ import {
   stripHtml,
   truncate,
   stableId,
+  verifyMany,
 } from "./util.js";
 
 // r/chicagofood exposes an RSS feed at .rss — no auth required for read-only.
@@ -45,5 +46,6 @@ export async function fetchItems() {
       published_at: item.isoDate || item.pubDate || null,
     });
   }
-  return out;
+  const alive = await verifyMany(out.map((o) => o.url));
+  return out.filter((o) => alive.get(o.url));
 }

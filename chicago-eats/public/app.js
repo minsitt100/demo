@@ -120,7 +120,9 @@ function renderCard(item) {
 }
 
 function renderCounts() {
-  $("#counts").textContent = `${state.total} opening${state.total === 1 ? "" : "s"} tracked`;
+  const window = state.maxAgeDays ? ` · past ${state.maxAgeDays} days` : "";
+  $("#counts").textContent =
+    `${state.total} opening${state.total === 1 ? "" : "s"} tracked${window}`;
 }
 
 function renderSourceFilters() {
@@ -169,6 +171,7 @@ async function loadStatus() {
     const s = await api("/api/status");
     state.sources = s.sources || [];
     state.total = s.total || 0;
+    state.maxAgeDays = s.maxAgeDays || null;
     renderSourceFilters();
     renderCounts();
     renderSourceStatus(s.recentRuns);
@@ -194,6 +197,7 @@ async function loadFeed(replace = true) {
   try {
     const res = await api(`/api/openings?${qs}`);
     state.total = res.total;
+    if (res.maxAgeDays) state.maxAgeDays = res.maxAgeDays;
     if (replace) state.items = res.items;
     else state.items = state.items.concat(res.items);
     renderFeed(replace);

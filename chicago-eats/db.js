@@ -46,18 +46,29 @@ const insertStmt = db.prepare(`
     (@id, @source, @source_label, @url, @title, @restaurant, @neighborhood, @status, @summary, @image_url, @published_at)
 `);
 
+// Shared WHERE clause so list + count stay in sync. Each caller passes:
+//   @source (nullable), @status (nullable), @cutoff (ISO timestamp string)
+const FILTER_WHERE = `
+  is_hidden = 0
+  AND (@source IS NULL OR source = @source)
+  AND (@status IS NULL OR status = @status)
+  AND COALESCE(published_at, seen_at) >= @cutoff
+`;
+
 const listStmt = db.prepare(`
   SELECT id, source, source_label, url, title, restaurant, neighborhood, status, summary, image_url, published_at, seen_at
   FROM openings
-  WHERE is_hidden = 0
-    AND (@source IS NULL OR source = @source)
-    AND (@status IS NULL OR status = @status)
+  WHERE ${FILTER_WHERE}
   ORDER BY COALESCE(published_at, seen_at) DESC
   LIMIT @limit OFFSET @offset
 `);
 
 const countStmt = db.prepare(`
-  SELECT COUNT(*) AS n FROM openings WHERE is_hidden = 0
+  SELECT COUNT(*) AS n FROM openings WHERE ${FILTER_WHERE}
+`);
+
+const allUnhiddenStmt = db.prepare(`
+  SELECT id, url FROM openings WHERE is_hidden = 0
 `);
 
 const startRunStmt = db.prepare(`
@@ -86,11 +97,14 @@ export const dbApi = {
     });
     return tx(items);
   },
-  list({ source = null, status = null, limit = 50, offset = 0 } = {}) {
-    return listStmt.all({ source, status, limit, offset });
+  list({ source = null, status = null, limit = 50, offset = 0, cutoff } = {}) {
+    return listStmt.all({ source, status, limit, offset, cutoff });
   },
-  count() {
-    return countStmt.get().n;
+  count({ source = null, status = null, cutoff } = {}) {
+    return countStmt.get({ source, status, cutoff }).n;
+  },
+  allUnhidden() {
+    return allUnhiddenStmt.all();
   },
   hide(id) {
     return db.prepare(`UPDATE openings SET is_hidden = 1 WHERE id = ?`).run(id).changes;
