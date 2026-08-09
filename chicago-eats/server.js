@@ -136,6 +136,7 @@ function aggregateRestaurants(openings) {
         url: o.url,
         title: o.title,
         published_at: o.published_at,
+        status: o.status,
       });
 
       const dt = o.published_at || o.seen_at;
@@ -144,6 +145,10 @@ function aggregateRestaurants(openings) {
   }
 
   return [...map.values()]
+    // Only show restaurants that have at least one "opening" (currently open)
+    // source article. Rows whose sources are all `upcoming` are future
+    // openings — per the site's rule, we don't surface those.
+    .filter((a) => a.sources.some((s) => s.status === "opening"))
     .map((a) => ({
       name: a.name,
       cuisine: a.cuisine,

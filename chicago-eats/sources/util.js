@@ -38,6 +38,11 @@ const UPCOMING_PATTERNS = [
   /\bopening (?:this|next|in)\b/i,
   /\bdebuting (?:this|next|in)\b/i,
   /\bexpand(?:s|ing) to\b/i,
+  /\bto open\b/i,                    // "chefs to open Midwestern restaurant"
+  /\bplans? to open\b/i,             // "chef plans to open"
+  /\bset to (?:debut|launch)\b/i,
+  /\bslated (?:to|for)\b/i,          // "slated to open"
+  /\b(?:coming|opening) (?:in|this) (?:january|february|march|april|may|june|july|august|september|october|november|december|fall|winter|spring|summer|20\d\d)\b/i,
 ];
 
 // Words that push us to skip — kept intentionally short so discovery

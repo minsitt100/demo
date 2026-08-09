@@ -114,13 +114,21 @@ export const dbApi = {
   setRestaurantsMentioned(id, jsonStr) {
     return updateRestaurantsStmt.run({ id, restaurants_mentioned: jsonStr }).changes;
   },
-  needsEnrichment({ includeEmpty = false } = {}) {
-    const where = includeEmpty
-      // "Empty" here means NULL OR the JSON literal "[]" — the latter is
-      // what a prior extraction pass wrote when it found (or errored into)
-      // no restaurants. Useful when re-running after a bug fix.
-      ? `is_hidden = 0 AND (restaurants_mentioned IS NULL OR restaurants_mentioned = '[]')`
-      : `is_hidden = 0 AND restaurants_mentioned IS NULL`;
+  needsEnrichment({ includeEmpty = false, includeAll = false } = {}) {
+    let where;
+    if (includeAll) {
+      // Every visible row — for use after a change to the extractor
+      // (e.g. tightened prompt) where existing non-empty results are also
+      // wrong and need to be redone. Costs an API call per row.
+      where = `is_hidden = 0`;
+    } else if (includeEmpty) {
+      // NULL OR the JSON literal "[]" — the latter is what a prior
+      // extraction pass wrote when it found (or errored into) no
+      // restaurants. Useful when re-running after a bug fix.
+      where = `is_hidden = 0 AND (restaurants_mentioned IS NULL OR restaurants_mentioned = '[]')`;
+    } else {
+      where = `is_hidden = 0 AND restaurants_mentioned IS NULL`;
+    }
     return db.prepare(
       `SELECT id, url, title FROM openings WHERE ${where}`
     ).all();

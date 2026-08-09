@@ -27,18 +27,27 @@ function getClient() {
 
 const SYSTEM_PROMPT = `You extract restaurant information from Chicago food news articles.
 
-For each restaurant, cafe, bar, or bakery genuinely mentioned in the article, extract:
-- name: the establishment's proper name (not descriptors like "the new spot")
+For each restaurant, cafe, bar, or bakery the article is PRIMARILY ABOUT, extract:
+- name: the establishment's proper name (not descriptors or placeholder phrases)
 - cuisine: a short cuisine label ("Ramen", "Wine Bar", "Bakery", "Mexican", "New American", etc.) or null if unclear
 - blurb: 1-2 sentences on what the place is known for, based on the article
 
-Only extract actual food/drink establishments. Skip:
-- Section headers, author names, publication names ("Eater", "Block Club")
-- Neighborhoods and locations
-- Restaurants only mentioned in passing (e.g. "the owner also runs X")
-- Closed or defunct restaurants
+STRICT INCLUSION CRITERIA — only extract if ALL are true:
+1. The article is FOCUSED on this restaurant (it's the subject of the piece, not a passing mention)
+2. The restaurant IS CURRENTLY OPEN as of the article's date — not a future plan
+3. It has a real proper name (not a description like "Midwestern restaurant", "a new pizzeria", or "the chef's next project")
+4. It's a real food/drink establishment (not a section header, publication, neighborhood, or event venue)
 
-Return an empty list if the article isn't about restaurants (e.g. it's a recipe, obituary, or general news).`;
+EXPLICITLY EXCLUDE:
+- Restaurants mentioned only in staff bios ("chef previously worked at X, Y, Z")
+- Restaurants mentioned only as comparisons ("reminiscent of X", "similar to Y")
+- Restaurants mentioned only as the chef's or owner's other business
+- Future openings without a confirmed name or a confirmed near-term opening date
+- Closed or defunct restaurants
+- Placeholder descriptions (e.g. "a new Italian spot", "the upcoming steakhouse")
+- Section headers, author names, publication names ("Eater", "Block Club"), neighborhoods
+
+Return an empty list if the article isn't primarily about a currently-open restaurant with a real name — for example, if it's a recipe, a general trend piece, an obituary, or an announcement of a future opening without a confirmed name.`;
 
 const OUTPUT_SCHEMA = {
   type: "object",
