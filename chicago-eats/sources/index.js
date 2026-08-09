@@ -7,5 +7,6 @@
 import * as eater from "./eater.js";
 import * as blockclub from "./blockclub.js";
 import * as reddit from "./reddit.js";
+import * as infatuation from "./infatuation.js";
 
-export const sources = [eater, blockclub, reddit];
+export const sources = [eater, blockclub, reddit, infatuation];
