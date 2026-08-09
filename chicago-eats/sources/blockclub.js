@@ -26,8 +26,9 @@ const parser = new Parser({
 export const meta = {
   id: "blockclub",
   label: "Block Club Chicago",
-  // Category feed for food & restaurant coverage.
-  feedUrl: "https://blockclubchicago.org/category/business/food-drink/feed/",
+  // Site-wide feed. Block Club is Chicago-only, so we lean on the opening
+  // classifier in sources/util.js to filter down to restaurant openings.
+  feedUrl: "https://blockclubchicago.org/feed/",
 };
 
 export async function fetchItems() {
