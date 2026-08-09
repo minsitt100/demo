@@ -116,7 +116,7 @@ export const dbApi = {
   },
   needsEnrichment() {
     return db.prepare(
-      `SELECT id, url FROM openings WHERE is_hidden = 0 AND restaurants_mentioned IS NULL`
+      `SELECT id, url, title FROM openings WHERE is_hidden = 0 AND restaurants_mentioned IS NULL`
     ).all();
   },
   list({ source = null, status = null, limit = 50, offset = 0, cutoff } = {}) {

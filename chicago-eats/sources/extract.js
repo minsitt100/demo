@@ -219,9 +219,15 @@ export function extractRestaurants(html) {
     .map(({ name, cuisine, blurb }) => ({ name, cuisine, blurb }));
 }
 
+// EXTRACTOR toggle. Set EXTRACTOR=llm plus ANTHROPIC_API_KEY to use the
+// Claude-powered extractor in extract-llm.js; anything else falls back to
+// the regex heuristics above.
+const USE_LLM =
+  process.env.EXTRACTOR === "llm" && !!process.env.ANTHROPIC_API_KEY;
+
 // Fetch an article and pull restaurant names out of it. Returns [] on any
 // failure — extraction is best-effort and should never break a scrape.
-export async function fetchAndExtract(url, { timeoutMs = 12000 } = {}) {
+export async function fetchAndExtract(url, { timeoutMs = 12000, title = "" } = {}) {
   if (!url) return [];
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -238,6 +244,10 @@ export async function fetchAndExtract(url, { timeoutMs = 12000 } = {}) {
     });
     if (!res.ok) return [];
     const html = await res.text();
+    if (USE_LLM) {
+      const { extractRestaurantsLLM } = await import("./extract-llm.js");
+      return await extractRestaurantsLLM(html, title);
+    }
     return extractRestaurants(html);
   } catch {
     return [];
@@ -247,18 +257,21 @@ export async function fetchAndExtract(url, { timeoutMs = 12000 } = {}) {
 }
 
 // Enrich a batch of scraped items with a restaurants_mentioned field
-// (JSON string). Bounded concurrency so we don't hammer a single host.
-export async function enrichWithRestaurants(items, { concurrency = 4 } = {}) {
+// (JSON string). Bounded concurrency so we don't hammer a single host (or
+// blow through API rate limits when the LLM extractor is on).
+export async function enrichWithRestaurants(items, { concurrency } = {}) {
+  // LLM calls are slower and rate-limited — dial concurrency down for that path.
+  const workers = concurrency ?? (USE_LLM ? 2 : 4);
   const queue = [...items];
   const results = new Map();
   async function worker() {
     while (queue.length) {
       const it = queue.shift();
-      const names = await fetchAndExtract(it.url);
+      const names = await fetchAndExtract(it.url, { title: it.title });
       results.set(it.url, names);
     }
   }
-  await Promise.all(Array.from({ length: concurrency }, worker));
+  await Promise.all(Array.from({ length: workers }, worker));
   return items.map((it) => ({
     ...it,
     restaurants_mentioned: JSON.stringify(results.get(it.url) || []),

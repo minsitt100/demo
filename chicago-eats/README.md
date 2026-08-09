@@ -58,6 +58,42 @@ the file to reset.
 - `POST /api/verify` — re-check every visible URL and hide dead ones
 - `POST /api/openings/:id/hide` — hide from feed
 
+## Restaurant extraction
+
+Every card shows the restaurant name, cuisine, and blurb extracted from the
+article body (or the aggregated best across sources). Two extractor
+backends, toggled with the `EXTRACTOR` env var:
+
+- **`regex` (default)** — no setup, no cost. `sources/extract.js` parses
+  `<h2>`/`<h3>` headers and paragraph-leading `<strong>` names, then
+  keyword-matches cuisines. Good on well-structured food outlets (Eater,
+  Block Club, Sun-Times, Infatuation), weaker on Google News.
+- **`llm`** — sends the article body to Claude and gets back a structured
+  list. Much better across messy publishers, and infers cuisine and blurb
+  as part of the same call.
+
+To turn on LLM extraction:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...          # get one at console.anthropic.com
+export EXTRACTOR=llm
+npm start
+```
+
+Defaults to `claude-haiku-4-5` (fast, cheap — roughly a fraction of a cent
+per article; a few dollars a month even with heavy scraping). Bump to a
+smarter model for messier articles:
+
+```bash
+ANTHROPIC_MODEL=claude-opus-5 EXTRACTOR=llm npm start
+```
+
+To re-run extraction on existing DB rows with the LLM backend:
+
+```bash
+EXTRACTOR=llm npm run enrich:restaurants
+```
+
 ## Freshness controls
 
 - **Only past 3 months are shown.** The list + count queries filter to items
