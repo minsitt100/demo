@@ -1,0 +1,109 @@
+import Database from "better-sqlite3";
+import { fileURLToPath } from "url";
+import path from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const db = new Database(path.join(__dirname, "openings.db"));
+db.pragma("journal_mode = WAL");
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS openings (
+    id            TEXT PRIMARY KEY,
+    source        TEXT NOT NULL,
+    source_label  TEXT NOT NULL,
+    url           TEXT NOT NULL UNIQUE,
+    title         TEXT NOT NULL,
+    restaurant    TEXT,
+    neighborhood  TEXT,
+    status        TEXT NOT NULL DEFAULT 'opening',
+    summary       TEXT,
+    image_url     TEXT,
+    published_at  TEXT,
+    seen_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    is_hidden     INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_openings_published ON openings(published_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_openings_source    ON openings(source);
+
+  CREATE TABLE IF NOT EXISTS scrape_runs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    source     TEXT NOT NULL,
+    started_at TEXT NOT NULL DEFAULT (datetime('now')),
+    finished_at TEXT,
+    fetched    INTEGER DEFAULT 0,
+    inserted   INTEGER DEFAULT 0,
+    error      TEXT
+  );
+`);
+
+const insertStmt = db.prepare(`
+  INSERT OR IGNORE INTO openings
+    (id, source, source_label, url, title, restaurant, neighborhood, status, summary, image_url, published_at)
+  VALUES
+    (@id, @source, @source_label, @url, @title, @restaurant, @neighborhood, @status, @summary, @image_url, @published_at)
+`);
+
+const listStmt = db.prepare(`
+  SELECT id, source, source_label, url, title, restaurant, neighborhood, status, summary, image_url, published_at, seen_at
+  FROM openings
+  WHERE is_hidden = 0
+    AND (@source IS NULL OR source = @source)
+    AND (@status IS NULL OR status = @status)
+  ORDER BY COALESCE(published_at, seen_at) DESC
+  LIMIT @limit OFFSET @offset
+`);
+
+const countStmt = db.prepare(`
+  SELECT COUNT(*) AS n FROM openings WHERE is_hidden = 0
+`);
+
+const startRunStmt = db.prepare(`
+  INSERT INTO scrape_runs (source) VALUES (?)
+`);
+const finishRunStmt = db.prepare(`
+  UPDATE scrape_runs SET finished_at = datetime('now'), fetched = ?, inserted = ?, error = ? WHERE id = ?
+`);
+
+const recentRunsStmt = db.prepare(`
+  SELECT source, started_at, finished_at, fetched, inserted, error
+  FROM scrape_runs
+  ORDER BY id DESC
+  LIMIT 20
+`);
+
+export const dbApi = {
+  insertMany(items) {
+    const tx = db.transaction((rows) => {
+      let inserted = 0;
+      for (const r of rows) {
+        const info = insertStmt.run(r);
+        if (info.changes > 0) inserted++;
+      }
+      return inserted;
+    });
+    return tx(items);
+  },
+  list({ source = null, status = null, limit = 50, offset = 0 } = {}) {
+    return listStmt.all({ source, status, limit, offset });
+  },
+  count() {
+    return countStmt.get().n;
+  },
+  hide(id) {
+    return db.prepare(`UPDATE openings SET is_hidden = 1 WHERE id = ?`).run(id).changes;
+  },
+  startRun(source) {
+    return startRunStmt.run(source).lastInsertRowid;
+  },
+  finishRun(id, { fetched = 0, inserted = 0, error = null } = {}) {
+    return finishRunStmt.run(fetched, inserted, error, id);
+  },
+  recentRuns() {
+    return recentRunsStmt.all();
+  },
+};
+
+export default db;

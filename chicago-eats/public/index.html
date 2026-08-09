@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chicago Eats — new restaurant openings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <div class="brand">
+          <span class="dot" aria-hidden="true"></span>
+          <div>
+            <h1>Chicago Eats</h1>
+            <p class="tagline">New restaurant openings, aggregated from the sources you trust.</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <span class="last-updated" id="last-updated">—</span>
+          <button class="btn ghost" id="refresh-btn" title="Fetch new items from all sources now">
+            <span class="btn-icon" aria-hidden="true">↻</span>
+            Refresh
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="filter-bar">
+        <div class="filters">
+          <div class="filter-group" role="tablist" aria-label="Status">
+            <button class="chip is-active" data-status="">All</button>
+            <button class="chip" data-status="opening">Now open</button>
+            <button class="chip" data-status="upcoming">Coming soon</button>
+          </div>
+          <div class="filter-group" id="source-filters">
+            <!-- source chips injected -->
+          </div>
+        </div>
+        <div class="counts" id="counts">—</div>
+      </section>
+
+      <section class="feed" id="feed" aria-live="polite"></section>
+
+      <div class="load-more-wrap">
+        <button class="btn primary" id="load-more" hidden>Load more</button>
+      </div>
+
+      <section class="footer-status" id="footer-status" hidden>
+        <h4>Sources</h4>
+        <ul id="source-status"></ul>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
