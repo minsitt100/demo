@@ -92,10 +92,16 @@ function looksLikeArticleTitle(name) {
   return false;
 }
 
+// IDs of currently-registered sources. Rows in the DB from sources that
+// have since been removed from sources/index.js are ignored — lets us
+// disable a source with a one-line change without wiping historical data.
+const activeSourceIds = new Set(sources.map((s) => s.meta.id));
+
 function aggregateRestaurants(openings) {
   const map = new Map(); // normalized name -> aggregate
 
   for (const o of openings) {
+    if (!activeSourceIds.has(o.source)) continue;
     // Distinguish "never attempted" (NULL) from "attempted, found nothing"
     // (empty JSON array). If an extractor already ran and returned nothing,
     // trust that — don't fall back to the noisy title-guess.
