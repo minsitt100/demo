@@ -15,7 +15,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { stripHtml } from "./util.js";
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5";
-const MAX_ARTICLE_CHARS = 16000;  // ~4000 tokens — Infatuation guides can be long
+const MAX_ARTICLE_CHARS = 48000;  // ~12000 tokens — Infatuation's long "Top 25" guides need the full body, not the intro
 
 // Lazy client — only constructed when actually called, so importing this
 // module without ANTHROPIC_API_KEY set doesn't crash.
@@ -90,7 +90,9 @@ export async function extractRestaurantsLLM(html, title = "") {
   try {
     const response = await getClient().messages.create({
       model: MODEL,
-      max_tokens: 2048,
+      // 25-restaurant guides can generate long structured output — bumped
+      // from 2048 so we don't truncate the JSON mid-array on big roundups.
+      max_tokens: 8192,
       // System prompt as a cacheable text block — repeated identically across
       // every extraction call in a scrape, so cache reads pay ~0.1x the
       // per-token price of a cold call.
