@@ -15,7 +15,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { stripHtml } from "./util.js";
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5";
-const MAX_ARTICLE_CHARS = 48000;  // ~12000 tokens — Infatuation's long "Top 25" guides need the full body, not the intro
+// ~12000 tokens. Sized to fit long roundup guides (Infatuation "Top 25",
+// Eater year-end lists, Sun-Times omnibus features) uncut — a truncated
+// article causes the LLM to see only the intro/hero and extract just the
+// article title as a fake "restaurant." Applies to every source.
+const MAX_ARTICLE_CHARS = 48000;
 
 // Lazy client — only constructed when actually called, so importing this
 // module without ANTHROPIC_API_KEY set doesn't crash.
@@ -90,8 +94,9 @@ export async function extractRestaurantsLLM(html, title = "") {
   try {
     const response = await getClient().messages.create({
       model: MODEL,
-      // 25-restaurant guides can generate long structured output — bumped
-      // from 2048 so we don't truncate the JSON mid-array on big roundups.
+      // Big structured outputs (25-restaurant guides, year-end lists) can
+      // exceed 2048 output tokens and truncate the JSON mid-array. Applies
+      // across all sources, not just Infatuation.
       max_tokens: 8192,
       // System prompt as a cacheable text block — repeated identically across
       // every extraction call in a scrape, so cache reads pay ~0.1x the
