@@ -6,6 +6,9 @@
 
 import { dbApi } from "../db.js";
 import { fetchAndExtract } from "../sources/extract.js";
+// This script calls fetchAndExtract directly (not enrichWithRestaurants),
+// so it bypasses the skipExisting check by design — it's meant to
+// re-process rows the caller explicitly asked for.
 
 // Look up each row's article title so the LLM extractor has that context.
 // (The regex extractor ignores it; passing it is harmless.)

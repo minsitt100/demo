@@ -267,10 +267,21 @@ export async function fetchAndExtract(url, { timeoutMs = 12000, title = "" } = {
 // Enrich a batch of scraped items with a restaurants_mentioned field
 // (JSON string). Bounded concurrency so we don't hammer a single host (or
 // blow through API rate limits when the LLM extractor is on).
-export async function enrichWithRestaurants(items, { concurrency } = {}) {
-  // LLM calls are slower and rate-limited — dial concurrency down for that path.
+//
+// By default, skips items whose URL is already in the DB — those already
+// have a stored restaurants_mentioned and re-extracting them just burns
+// API calls. Pass skipExisting=false to force re-extract (used by the
+// backfill script when it wants to redo everything).
+export async function enrichWithRestaurants(items, { concurrency, skipExisting = true } = {}) {
   const workers = concurrency ?? (USE_LLM ? 2 : 4);
-  const queue = [...items];
+
+  let toEnrich = items;
+  if (skipExisting) {
+    const { dbApi } = await import("../db.js");
+    toEnrich = items.filter((it) => !dbApi.hasUrl(it.url));
+  }
+
+  const queue = [...toEnrich];
   const results = new Map();
   async function worker() {
     while (queue.length) {
@@ -280,8 +291,10 @@ export async function enrichWithRestaurants(items, { concurrency } = {}) {
     }
   }
   await Promise.all(Array.from({ length: workers }, worker));
-  return items.map((it) => ({
-    ...it,
-    restaurants_mentioned: JSON.stringify(results.get(it.url) || []),
-  }));
+  // Only items we actually enriched get restaurants_mentioned set; the rest
+  // pass through unchanged so INSERT OR IGNORE keeps their stored value.
+  return items.map((it) => {
+    if (!results.has(it.url)) return it;
+    return { ...it, restaurants_mentioned: JSON.stringify(results.get(it.url) || []) };
+  });
 }

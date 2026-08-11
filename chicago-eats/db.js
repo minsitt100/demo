@@ -156,6 +156,9 @@ export const dbApi = {
   hide(id) {
     return db.prepare(`UPDATE openings SET is_hidden = 1 WHERE id = ?`).run(id).changes;
   },
+  hasUrl(url) {
+    return !!db.prepare(`SELECT 1 FROM openings WHERE url = ?`).get(url);
+  },
   startRun(source) {
     return startRunStmt.run(source).lastInsertRowid;
   },
