@@ -76,9 +76,12 @@ function looksLikeArticleTitle(name) {
   if (/\s(opens?|opening|debuts?|coming to|now open)\s/i.test(t)) return true;
   if (/\bnew\s+(restaurants?|spots?|openings?|places?)/i.test(t)) return true;
   if (/^(where|how|why|the best|best|these|inside|meet|this|watch)\s/i.test(t)) return true;
+  if (/^(top|our)\s+\d/i.test(t)) return true;             // "Top 25", "Our 12"
   if (/^(a|an)\s+[a-z]/.test(t)) return true;              // "A luxury steakhouse"
   if (/\b(chic|luxury|hot new|buzzy|trendy)\b/i.test(t)) return true;   // headline-descriptor giveaways
+  if (/\b(highest-rated|top-rated|must-try|best of|hit list)\b/i.test(t)) return true;
   if (/\bis\s*$/i.test(t)) return true;                    // "A luxury steakhouse is" (truncated)
+  if (/[:—–]/.test(t)) return true;                         // colon / em-dash → title punctuation
   if ((t.match(/,/g) || []).length >= 2) return true;      // list-comma structure
   return false;
 }
