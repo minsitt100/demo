@@ -1,6 +1,7 @@
 import Parser from "rss-parser";
 import {
   looksLikeOpening,
+  mentionsFood,
   classifyStatus,
   extractNeighborhood,
   guessRestaurant,
@@ -46,9 +47,12 @@ export async function fetchItems() {
     const summary = truncate(stripHtml(item.contentSnippet || contentHtml), 260);
     const haystack = `${title} ${summary}`;
 
-    // Sun-Times is Chicago-only, so no mentionsChicago() gate needed —
-    // just the opening classifier.
+    // Sun-Times is Chicago-only, so no mentionsChicago() gate needed. But
+    // it's also multi-topic (sports, news, weather, food) — require a
+    // food mention alongside the opening keyword so a football article
+    // that happens to contain "opens" doesn't slip through.
     if (!looksLikeOpening(haystack)) continue;
+    if (!mentionsFood(haystack)) continue;
 
     const image =
       item.mediaThumbnail?.$?.url ||

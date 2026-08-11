@@ -89,6 +89,11 @@ function looksLikeArticleTitle(name) {
   if (t === t.toUpperCase() && /\s/.test(t)) return true;
   // Common generic section labels regardless of case
   if (/^the\s+(spots?|picks?|list|best|winners?|highlights?|contenders?|newcomers?)$/i.test(t)) return true;
+  // "First Last, Location" style — usually a person + school/city caption
+  // from a non-food article (e.g. Sun-Times high school sports coverage).
+  // Real restaurants don't append a location to their name in this shape;
+  // if they did, the location would live in the neighborhood field instead.
+  if (/^[A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+,\s+[A-Z]/.test(t)) return true;
   return false;
 }
 

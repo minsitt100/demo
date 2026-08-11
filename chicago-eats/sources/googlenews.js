@@ -1,6 +1,7 @@
 import Parser from "rss-parser";
 import {
   looksLikeOpening,
+  mentionsFood,
   classifyStatus,
   mentionsChicago,
   extractNeighborhood,
@@ -53,9 +54,12 @@ export async function fetchItems() {
     const haystack = `${title} ${summary}`;
 
     // Query already narrows this, but keep the belt-and-suspenders checks:
-    // Google News occasionally returns loosely-related items.
+    // Google News occasionally returns loosely-related items (opening
+    // ceremonies, "stars poised to open the season", etc.). Require both
+    // a Chicago mention AND a food mention alongside the opening keyword.
     if (!mentionsChicago(haystack)) continue;
     if (!looksLikeOpening(haystack)) continue;
+    if (!mentionsFood(haystack)) continue;
 
     out.push({
       id: stableId(meta.id, item.link),

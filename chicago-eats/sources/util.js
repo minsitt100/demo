@@ -55,7 +55,33 @@ const SKIP_PATTERNS = [
   /\bshutting\b/i,
   /\brecipe\b/i,
   /\bobituary\b/i,
+  // Sports content — reliably slips past the opening-signal check on
+  // broad publisher feeds (Sun-Times sitewide, Google News).
+  /\bhigh school\b/i,
+  /\b(football|basketball|baseball|hockey|soccer|volleyball|tennis|golf|lacrosse)\s+(star|player|team|coach|game|season|match|tournament|scores?|schedule)\b/i,
+  /\b(quarterback|linebacker|running back|wide receiver|point guard|striker|goalie|goaltender)\b/i,
+  /\b(rookie|draft pick|championship|playoffs)\b/i,
 ];
+
+// Food-related terms — used as an "is this article actually about food?"
+// gate on broad publisher feeds (Sun-Times, Google News) that mix
+// restaurant coverage with sports, weather, politics, etc.
+const FOOD_PATTERNS = [
+  /\brestaurants?\b/i, /\bcaf[eé]s?\b/i, /\bbars?\b/i,
+  /\bbakery\b/i, /\bbakeries\b/i, /\beatery\b/i, /\beateries\b/i,
+  /\bdining\b/i, /\bchef\b/i, /\bmenu\b/i, /\bdish(?:es)?\b/i,
+  /\bcuisine\b/i, /\bfood\b/i, /\bculinary\b/i, /\bcoffee\b/i,
+  /\bbrewery\b/i, /\bbreweries\b/i, /\bcocktails?\b/i,
+  /\bwine\s+(?:bar|list|program)\b/i, /\bbistro\b/i,
+  /\bpizza\b/i, /\bpizzeria\b/i, /\bramen\b/i, /\bsushi\b/i,
+  /\btaqueria\b/i, /\btacos?\b/i, /\bpastry\b/i, /\bpastries\b/i,
+  /\bgastropub\b/i, /\bsteakhouse\b/i, /\btasting menu\b/i,
+];
+
+export function mentionsFood(text) {
+  if (!text) return false;
+  return FOOD_PATTERNS.some((r) => r.test(text));
+}
 
 // Returns { kept, reason } so debugging tools can show why an item was
 // dropped. `looksLikeOpening` stays as a boolean wrapper.
