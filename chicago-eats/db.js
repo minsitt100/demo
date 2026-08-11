@@ -40,10 +40,16 @@ db.exec(`
   );
 `);
 
-// Migration: databases created before this column existed need it added.
+// Migration: databases created before these columns existed need them added.
 const existingCols = db.prepare("PRAGMA table_info(openings)").all().map((c) => c.name);
 if (!existingCols.includes("restaurants_mentioned")) {
   db.exec("ALTER TABLE openings ADD COLUMN restaurants_mentioned TEXT");
+}
+if (!existingCols.includes("extracted_at")) {
+  // Tracks when restaurants_mentioned was last written. Used by curated
+  // "living page" sources to decide when to re-run extraction against
+  // pages whose content changes over time.
+  db.exec("ALTER TABLE openings ADD COLUMN extracted_at TEXT");
 }
 
 const insertStmt = db.prepare(`
@@ -54,7 +60,15 @@ const insertStmt = db.prepare(`
 `);
 
 const updateRestaurantsStmt = db.prepare(`
-  UPDATE openings SET restaurants_mentioned = @restaurants_mentioned WHERE id = @id
+  UPDATE openings
+  SET restaurants_mentioned = @restaurants_mentioned,
+      extracted_at = datetime('now')
+  WHERE id = @id
+`);
+
+const isStaleStmt = db.prepare(`
+  SELECT (extracted_at IS NULL OR extracted_at < datetime('now', '-' || ? || ' days')) AS stale
+  FROM openings WHERE id = ?
 `);
 
 // Shared WHERE clause so list + count stay in sync. Each caller passes:
@@ -102,10 +116,16 @@ export const dbApi = {
     const tx = db.transaction((rows) => {
       let inserted = 0;
       for (const r of rows) {
-        // Ensure the new field is present so the prepared statement can bind.
         if (r.restaurants_mentioned === undefined) r.restaurants_mentioned = null;
         const info = insertStmt.run(r);
-        if (info.changes > 0) inserted++;
+        if (info.changes > 0) {
+          inserted++;
+          // Also mark extracted_at so weekly-recheck logic knows when the
+          // restaurants_mentioned on this row was last written.
+          if (r.restaurants_mentioned !== null) {
+            db.prepare(`UPDATE openings SET extracted_at = datetime('now') WHERE id = ?`).run(r.id);
+          }
+        }
       }
       return inserted;
     });
@@ -113,6 +133,10 @@ export const dbApi = {
   },
   setRestaurantsMentioned(id, jsonStr) {
     return updateRestaurantsStmt.run({ id, restaurants_mentioned: jsonStr }).changes;
+  },
+  isStale(id, olderThanDays) {
+    const row = isStaleStmt.get(olderThanDays, id);
+    return row ? !!row.stale : false;
   },
   needsEnrichment({ includeEmpty = false, includeAll = false } = {}) {
     let where;

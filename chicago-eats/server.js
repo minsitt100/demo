@@ -116,6 +116,9 @@ function aggregateRestaurants(openings) {
           name: r.name,
           cuisine: null,
           blurb: null,
+          take: null,
+          topDishes: new Set(),
+          priceBand: null,
           neighborhoods: new Set(),
           sources: [],
           firstSeen: null,
@@ -124,11 +127,26 @@ function aggregateRestaurants(openings) {
       }
 
       if (!agg.cuisine && r.cuisine) agg.cuisine = r.cuisine;
-      // Prefer the longest blurb — usually the richest description.
       if (r.blurb && (!agg.blurb || r.blurb.length > agg.blurb.length)) {
         agg.blurb = r.blurb;
       }
-      if (o.neighborhood) agg.neighborhoods.add(o.neighborhood);
+      // Take (opinion) — prefer the longest. This is usually the reviewer's
+      // richest characterization of the place.
+      if (r.take && (!agg.take || r.take.length > agg.take.length)) {
+        agg.take = r.take;
+      }
+      // Top dishes — union across sources, capped at 8.
+      if (Array.isArray(r.top_dishes)) {
+        for (const dish of r.top_dishes) {
+          if (typeof dish === "string" && dish.trim()) agg.topDishes.add(dish.trim());
+        }
+      }
+      if (!agg.priceBand && r.price_band) agg.priceBand = r.price_band;
+      // Neighborhood: prefer the per-restaurant LLM inference over the
+      // article-level neighborhood, which is often the article's subject
+      // location, not this specific restaurant's.
+      if (r.neighborhood) agg.neighborhoods.add(r.neighborhood);
+      else if (o.neighborhood) agg.neighborhoods.add(o.neighborhood);
 
       agg.sources.push({
         source: o.source,
@@ -153,6 +171,9 @@ function aggregateRestaurants(openings) {
       name: a.name,
       cuisine: a.cuisine,
       blurb: a.blurb,
+      take: a.take,
+      topDishes: [...a.topDishes].slice(0, 8),
+      priceBand: a.priceBand,
       neighborhoods: [...a.neighborhoods],
       sources: a.sources.sort((x, y) =>
         (y.published_at || "").localeCompare(x.published_at || "")

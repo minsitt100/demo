@@ -1,75 +1,70 @@
-import Parser from "rss-parser";
-import {
-  looksLikeOpening,
-  classifyStatus,
-  mentionsChicago,
-  extractNeighborhood,
-  guessRestaurant,
-  stripHtml,
-  truncate,
-  stableId,
-  firstImageFromHtml,
-  verifyMany,
-} from "./util.js";
+// The Infatuation doesn't publish a public RSS feed, and their content shape
+// is fundamentally different from news sites like Eater. Their high-value
+// pieces are LIVING GUIDES at stable URLs — "New Chicago Restaurant
+// Openings", "The Hit List", etc. The URL never changes; the *content* at
+// the URL updates as they add/remove restaurants over time.
+//
+// So instead of trying to discover new URLs, we curate a small set of guide
+// URLs here and re-extract them on a weekly cadence (reExtractEveryDays).
+// The LLM extractor pulls the restaurants + dishes + Infatuation's take
+// from each guide's article body.
+//
+// To add another Infatuation guide, add its URL + title to the `articles`
+// array below. To add another RSS-less publisher (Time Out, Michelin, etc.)
+// use this file as the template.
 
-const parser = new Parser({
-  timeout: 15000,
-  headers: {
-    "User-Agent":
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
-      "(KHTML, like Gecko) Chrome/122.0 Safari/537.36 chicago-eats/0.1",
-  },
-  customFields: {
-    item: [
-      ["content:encoded", "contentEncoded"],
-      ["media:thumbnail", "mediaThumbnail"],
-      ["media:content", "mediaContent"],
-    ],
-  },
-});
+import { stableId, verifyMany } from "./util.js";
 
 export const meta = {
   id: "infatuation",
   label: "The Infatuation Chicago",
-  // The Infatuation exposes a site-wide RSS at /rss. It's not Chicago-scoped,
-  // so we filter items down by a Chicago mention below.
-  feedUrl: "https://www.theinfatuation.com/rss",
+  // Cadence for re-running LLM extraction against these URLs. Their guides
+  // update roughly monthly; 7 days is comfortable headroom.
+  reExtractEveryDays: 7,
+  articles: [
+    {
+      url: "https://www.theinfatuation.com/chicago/guides/new-chicago-restaurant-openings",
+      title: "The Infatuation — New Chicago Restaurant Openings",
+    },
+    {
+      url: "https://www.theinfatuation.com/chicago/guides/best-new-chicago-restaurants-hit-list",
+      title: "The Infatuation — Best New Chicago Restaurants (The Hit List)",
+    },
+    {
+      url: "https://www.theinfatuation.com/chicago/guides/best-restaurants-chicago",
+      title: "The Infatuation — The Best Restaurants in Chicago",
+    },
+  ],
 };
 
 export async function fetchItems() {
-  const feed = await parser.parseURL(meta.feedUrl);
-  const out = [];
-  for (const item of feed.items || []) {
-    const title = item.title || "";
-    const contentHtml = item.contentEncoded || item.content || "";
-    const summary = truncate(stripHtml(item.contentSnippet || contentHtml), 260);
-    const haystack = `${title} ${summary} ${item.link || ""}`;
+  const items = meta.articles.map((a) => ({
+    id: stableId(meta.id, a.url),
+    source: meta.id,
+    source_label: meta.label,
+    url: a.url,
+    title: a.title,
+    restaurant: null,       // no title-guessing for curated guide URLs
+    neighborhood: null,     // extractor infers per restaurant
+    status: "opening",      // curated guides are currently-published
+    summary: null,
+    image_url: null,
+    published_at: null,     // seen_at is the effective date for stable URLs
+  }));
 
-    // Site-wide feed — must mention Chicago (in title, summary, or URL slug).
-    if (!mentionsChicago(haystack)) continue;
-    if (!looksLikeOpening(haystack)) continue;
+  const alive = await verifyMany(items.map((i) => i.url));
+  const survivors = items.filter((i) => alive.get(i.url));
 
-    const image =
-      item.mediaThumbnail?.$?.url ||
-      item.mediaContent?.$?.url ||
-      firstImageFromHtml(contentHtml);
+  const { enrichWithRestaurants, refreshStaleUrls } = await import("./extract.js");
 
-    out.push({
-      id: stableId(meta.id, item.link),
-      source: meta.id,
-      source_label: meta.label,
-      url: item.link,
-      title,
-      restaurant: guessRestaurant(title),
-      neighborhood: extractNeighborhood(haystack),
-      status: classifyStatus(haystack),
-      summary,
-      image_url: image || null,
-      published_at: item.isoDate || item.pubDate || null,
-    });
-  }
-  const alive = await verifyMany(out.map((o) => o.url));
-  const survivors = out.filter((o) => alive.get(o.url));
-  const { enrichWithRestaurants } = await import("./extract.js");
-  return await enrichWithRestaurants(survivors);
+  // First run through fresh extraction — new URLs (skipExisting=true means
+  // already-stored URLs pass through untouched).
+  const enriched = await enrichWithRestaurants(survivors);
+
+  // Then re-check existing URLs on the weekly cadence. Because Infatuation
+  // updates guide content in place, this is how we catch new restaurants
+  // they've added since our last check.
+  await refreshStaleUrls(survivors, { olderThanDays: meta.reExtractEveryDays });
+
+  return enriched;
 }

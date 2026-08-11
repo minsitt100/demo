@@ -15,7 +15,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { stripHtml } from "./util.js";
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5";
-const MAX_ARTICLE_CHARS = 8000;  // ~2000 tokens; enough for full articles / most roundups
+const MAX_ARTICLE_CHARS = 16000;  // ~4000 tokens — Infatuation guides can be long
 
 // Lazy client — only constructed when actually called, so importing this
 // module without ANTHROPIC_API_KEY set doesn't crash.
@@ -25,29 +25,35 @@ function getClient() {
   return client;
 }
 
-const SYSTEM_PROMPT = `You extract restaurant information from Chicago food news articles.
+const SYSTEM_PROMPT = `You extract restaurant information from Chicago food news articles and guides.
 
-For each restaurant, cafe, bar, or bakery the article is PRIMARILY ABOUT, extract:
-- name: the establishment's proper name (not descriptors or placeholder phrases)
-- cuisine: a short cuisine label ("Ramen", "Wine Bar", "Bakery", "Mexican", "New American", etc.) or null if unclear
-- blurb: 1-2 sentences on what the place is known for, based on the article
+For each restaurant, cafe, bar, or bakery the article covers, extract:
+- name: the establishment's proper name (not a descriptor or placeholder)
+- cuisine: short cuisine label ("Ramen", "Wine Bar", "Bakery", "Mexican", "New American", etc.) or null if genuinely unclear
+- neighborhood: Chicago neighborhood if the article mentions it (e.g. "West Loop", "Wicker Park", "Fulton Market") or null
+- blurb: 1-2 sentences of factual description of what the place is
+- take: 1-2 sentences capturing the article's opinion in the reviewer's voice ("go for the pasta and stay for the natural wine list", "impressive room, average food"). If the article is purely factual news with no opinion, use null.
+- top_dishes: 2-5 specific menu items the article recommends by name (e.g. ["Adobo", "Halo-halo", "Bibingka"]). Empty array if the article doesn't call out specific dishes.
+- price_band: "$", "$$", "$$$", or "$$$$" if the article signals the price range (from mentions of tasting menus, splurge, cheap eats, etc.), or null
 
 STRICT INCLUSION CRITERIA — only extract if ALL are true:
-1. The article is FOCUSED on this restaurant (it's the subject of the piece, not a passing mention)
+1. The article is about this restaurant (it's a subject, not a passing mention)
 2. The restaurant IS CURRENTLY OPEN as of the article's date — not a future plan
-3. It has a real proper name (not a description like "Midwestern restaurant", "a new pizzeria", or "the chef's next project")
-4. It's a real food/drink establishment (not a section header, publication, neighborhood, or event venue)
+3. It has a real proper name (not "Midwestern restaurant", "a new pizzeria", "the chef's next project")
+4. It's a real food/drink establishment
+
+For guide-style articles (roundups like "Best New Restaurants" or "Where to Eat in West Loop"), each restaurant listed in the guide IS a subject — extract all of them, with their dishes and the writer's take on each.
 
 EXPLICITLY EXCLUDE:
 - Restaurants mentioned only in staff bios ("chef previously worked at X, Y, Z")
-- Restaurants mentioned only as comparisons ("reminiscent of X", "similar to Y")
+- Restaurants mentioned only as comparisons ("reminiscent of X")
 - Restaurants mentioned only as the chef's or owner's other business
-- Future openings without a confirmed name or a confirmed near-term opening date
+- Future openings without a confirmed name or near-term opening date
 - Closed or defunct restaurants
-- Placeholder descriptions (e.g. "a new Italian spot", "the upcoming steakhouse")
-- Section headers, author names, publication names ("Eater", "Block Club"), neighborhoods
+- Placeholder descriptions
+- Section headers, author names, publication names, neighborhoods
 
-Return an empty list if the article isn't primarily about a currently-open restaurant with a real name — for example, if it's a recipe, a general trend piece, an obituary, or an announcement of a future opening without a confirmed name.`;
+Return an empty list if the article isn't about currently-open restaurants — recipes, trend pieces without specific places, obituaries, future-opening announcements without confirmed names.`;
 
 const OUTPUT_SCHEMA = {
   type: "object",
@@ -57,11 +63,15 @@ const OUTPUT_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          name:    { type: "string" },
-          cuisine: { type: ["string", "null"] },
-          blurb:   { type: ["string", "null"] },
+          name:         { type: "string" },
+          cuisine:      { type: ["string", "null"] },
+          neighborhood: { type: ["string", "null"] },
+          blurb:        { type: ["string", "null"] },
+          take:         { type: ["string", "null"] },
+          top_dishes:   { type: "array", items: { type: "string" } },
+          price_band:   { type: ["string", "null"] },
         },
-        required: ["name", "cuisine", "blurb"],
+        required: ["name", "cuisine", "neighborhood", "blurb", "take", "top_dishes", "price_band"],
         additionalProperties: false,
       },
     },

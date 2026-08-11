@@ -264,6 +264,27 @@ export async function fetchAndExtract(url, { timeoutMs = 12000, title = "" } = {
   }
 }
 
+// Re-extract restaurants for URLs that are stale — i.e., their content lives
+// at a stable URL that gets updated over time (Infatuation guides, "best of"
+// lists). Only touches items whose extracted_at is older than olderThanDays.
+// Returns the number of rows updated.
+export async function refreshStaleUrls(items, { olderThanDays = 7 } = {}) {
+  if (!items.length) return 0;
+  const { dbApi } = await import("../db.js");
+  const stale = items.filter((it) => dbApi.isStale(it.id, olderThanDays));
+  if (!stale.length) return 0;
+  const enriched = await enrichWithRestaurants(stale, { skipExisting: false });
+  let updated = 0;
+  for (const it of enriched) {
+    if (it.restaurants_mentioned !== undefined) {
+      dbApi.setRestaurantsMentioned(it.id, it.restaurants_mentioned);
+      updated++;
+    }
+  }
+  console.log(`[refresh] re-extracted ${updated} stale row(s)`);
+  return updated;
+}
+
 // Enrich a batch of scraped items with a restaurants_mentioned field
 // (JSON string). Bounded concurrency so we don't hammer a single host (or
 // blow through API rate limits when the LLM extractor is on).

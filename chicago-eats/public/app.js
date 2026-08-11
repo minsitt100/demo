@@ -112,6 +112,9 @@ function renderCard(r) {
     ? r.neighborhoods.slice(0, 2).join(" · ")
     : "Chicago";
 
+  const dishes = Array.isArray(r.topDishes) ? r.topDishes : [];
+  const takeBody = r.take || r.blurb;
+
   el.innerHTML = `
     <header class="rcard-primary">
       <h3 class="rcard-name">${escapeHtml(r.name)}</h3>
@@ -122,9 +125,18 @@ function renderCard(r) {
     </header>
     <div class="rcard-tags">
       ${cuisineChip(r.cuisine)}
+      ${r.priceBand ? `<span class="price-tag">${escapeHtml(r.priceBand)}</span>` : ""}
       ${r.firstSeen ? `<span class="since-tag">Since ${shortDate(r.firstSeen)}</span>` : ""}
     </div>
-    ${r.blurb ? `<p class="rcard-blurb">${escapeHtml(r.blurb)}</p>` : `<p class="rcard-blurb rcard-blurb-empty">No description yet.</p>`}
+    ${takeBody
+      ? `<p class="rcard-take">${r.take ? `<span class="take-mark">“</span>` : ""}${escapeHtml(takeBody)}${r.take ? `<span class="take-mark">”</span>` : ""}</p>`
+      : `<p class="rcard-take rcard-take-empty">No description yet.</p>`}
+    ${dishes.length ? `
+      <div class="rcard-dishes">
+        <span class="dishes-label">Order</span>
+        <span class="dishes-list">${dishes.slice(0, 5).map(d => `<span class="dish">${escapeHtml(d)}</span>`).join("")}</span>
+      </div>
+    ` : ""}
     <footer class="rcard-foot">
       <span class="mention-count">${r.mentions} article${r.mentions === 1 ? "" : "s"}</span>
       <button class="rcard-toggle" data-toggle="${id}">
