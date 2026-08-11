@@ -157,16 +157,35 @@ export function guessRestaurant(title) {
   return candidate;
 }
 
+// Decode common HTML entities to real characters. Handles both named
+// entities (&amp;, &nbsp;), decimal numeric (&#39;), and hex numeric
+// (&#x27;) — the last of which Infatuation uses everywhere for
+// apostrophes, causing "Chuy&#x27;s" to survive extraction otherwise.
+function decodeEntities(text) {
+  return text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => {
+      const code = parseInt(n, 16);
+      try { return String.fromCodePoint(code); } catch { return ""; }
+    })
+    .replace(/&#(\d+);/g, (_, n) => {
+      const code = parseInt(n, 10);
+      try { return String.fromCodePoint(code); } catch { return ""; }
+    })
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");  // amp last so we don't double-decode
+}
+
 export function stripHtml(html) {
   if (!html) return "";
-  return html
+  const stripped = html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&#39;/g, "'")
-    .replace(/&quot;/g, '"')
+    .replace(/<[^>]+>/g, " ");
+  return decodeEntities(stripped)
     .replace(/\s+/g, " ")
     .trim();
 }

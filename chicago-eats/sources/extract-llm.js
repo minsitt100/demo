@@ -32,13 +32,13 @@ function getClient() {
 const SYSTEM_PROMPT = `You extract restaurant information from Chicago food news articles and guides.
 
 For each restaurant, cafe, bar, or bakery the article covers, extract:
-- name: the establishment's proper name (not a descriptor or placeholder)
-- cuisine: short cuisine label ("Ramen", "Wine Bar", "Bakery", "Mexican", "New American", etc.) or null if genuinely unclear
-- neighborhood: Chicago neighborhood if the article mentions it (e.g. "West Loop", "Wicker Park", "Fulton Market") or null
-- blurb: 1-2 sentences of factual description of what the place is
+- name: the restaurant's proper name only. Do not include quotation marks, price glyphs, addresses, or descriptors. If the raw text near the name contains HTML entity artifacts (e.g. "&#x27;", "&amp;"), replace them with the character they represent ("'" and "&").
+- cuisine: a short cuisine label ("Ramen", "Wine Bar", "Bakery", "Mexican", "New American", etc.) or null if genuinely unclear
+- neighborhood: the Chicago neighborhood the restaurant is in (e.g. "West Loop", "Wicker Park", "Portage Park"). Extract this even if it's rendered next to the address. Null only if the article truly doesn't say where.
+- blurb: a clean 1-2 sentence factual description of what the place is, in your own words. STRICTLY EXCLUDE from the blurb: addresses, phone numbers, price glyphs ("$", "$ $ $ $"), the cuisine label, the neighborhood name, UI text like "Save spot" or "Reserve", and any hours/day-of-week strings. Those data points belong in their own fields (cuisine, neighborhood, price_band) or are dropped entirely.
 - take: 1-2 sentences capturing the article's opinion in the reviewer's voice ("go for the pasta and stay for the natural wine list", "impressive room, average food"). If the article is purely factual news with no opinion, use null.
 - top_dishes: 2-5 specific menu items the article recommends by name (e.g. ["Adobo", "Halo-halo", "Bibingka"]). Empty array if the article doesn't call out specific dishes.
-- price_band: "$", "$$", "$$$", or "$$$$" if the article signals the price range (from mentions of tasting menus, splurge, cheap eats, etc.), or null
+- price_band: "$", "$$", "$$$", or "$$$$" — infer from cost signals in the article: $ = cheap eats, $$ = moderate, $$$ = expensive, $$$$ = splurge/tasting-menu. If the page shows "$ $ $ $" as glyphs (Infatuation's format), count the glyphs. Null only if there is no price signal at all.
 
 STRICT INCLUSION CRITERIA — only extract if ALL are true:
 1. The article is about this restaurant (it's a subject, not a passing mention)

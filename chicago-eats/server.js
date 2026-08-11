@@ -83,6 +83,12 @@ function looksLikeArticleTitle(name) {
   if (/\bis\s*$/i.test(t)) return true;                    // "A luxury steakhouse is" (truncated)
   if (/[:—–]/.test(t)) return true;                         // colon / em-dash → title punctuation
   if ((t.match(/,/g) || []).length >= 2) return true;      // list-comma structure
+  // ALL-CAPS multi-word strings are almost always section headers
+  // ("THE SPOTS", "OUR PICKS", "THE WINNERS"). Keep short single-word
+  // all-caps like "NAIA" or "STK" — real short brand names.
+  if (t === t.toUpperCase() && /\s/.test(t)) return true;
+  // Common generic section labels regardless of case
+  if (/^the\s+(spots?|picks?|list|best|winners?|highlights?|contenders?|newcomers?)$/i.test(t)) return true;
   return false;
 }
 
