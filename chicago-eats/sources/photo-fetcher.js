@@ -22,11 +22,17 @@
 // hides a restaurant.
 
 import db from "../db.js";
+import { pickBestPhoto, isPhotoPickerEnabled } from "./photo-picker.js";
 
 const API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 const CHICAGO_CENTER = { latitude: 41.8781, longitude: -87.6298 };
 const SEARCH_RADIUS_M = 25000; // 25 km covers all of Chicago + inner suburbs
 const PHOTO_MAX_HEIGHT = 800;
+// Number of photos to consider per restaurant. Google Places returns up
+// to 10 in ranked order; we pull the top N URIs and let the picker rank
+// them for food-forwardness. Higher N = better food-photo hit rate but
+// more Places photo-media calls billed. 5 is the sweet spot.
+const PHOTO_CANDIDATES = parseInt(process.env.PHOTO_CANDIDATES, 10) || 5;
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS place_photos (
@@ -40,6 +46,14 @@ db.exec(`
   );
 `);
 
+// Migration: older DBs won't have the picker's `kind` column.
+const photoCols = db.prepare("PRAGMA table_info(place_photos)").all().map((c) => c.name);
+if (!photoCols.includes("kind")) {
+  // What the picker classified the chosen photo as: food | drink |
+  // interior | exterior | menu | other. Useful for measuring hit rate.
+  db.exec("ALTER TABLE place_photos ADD COLUMN kind TEXT");
+}
+
 function normalizeKey(name, neighborhood) {
   const n = String(name || "").toLowerCase().trim().replace(/\s+/g, " ");
   const h = String(neighborhood || "").toLowerCase().trim();
@@ -48,12 +62,13 @@ function normalizeKey(name, neighborhood) {
 
 const getCached = db.prepare(`SELECT * FROM place_photos WHERE key = ?`);
 const upsert = db.prepare(`
-  INSERT INTO place_photos (key, name, neighborhood, place_id, photo_url, status)
-  VALUES (@key, @name, @neighborhood, @place_id, @photo_url, @status)
+  INSERT INTO place_photos (key, name, neighborhood, place_id, photo_url, status, kind)
+  VALUES (@key, @name, @neighborhood, @place_id, @photo_url, @status, @kind)
   ON CONFLICT(key) DO UPDATE SET
     place_id = excluded.place_id,
     photo_url = excluded.photo_url,
     status = excluded.status,
+    kind = excluded.kind,
     fetched_at = datetime('now')
 `);
 
@@ -110,6 +125,9 @@ async function resolvePhotoUri(photoResourceName) {
 
 // Fetch (or return cached) photo for a restaurant. Every call ends up
 // persisted so subsequent calls are DB-cached — including negative results.
+// When the picker is enabled, resolves the top N candidate URIs and asks
+// Claude vision to choose the most food-forward one; otherwise uses
+// Google's own top-ranked photo.
 export async function fetchPhotoNow(name, neighborhood) {
   if (!API_KEY) throw new Error("GOOGLE_PLACES_API_KEY not set");
   const key = normalizeKey(name, neighborhood);
@@ -123,18 +141,30 @@ export async function fetchPhotoNow(name, neighborhood) {
     place_id: null,
     photo_url: null,
     status: "not_found",
+    kind: null,
   };
   try {
     const search = await textSearch(name, neighborhood);
     const place = search.places?.[0];
     if (place) {
       record.place_id = place.id || null;
-      const photoResourceName = place.photos?.[0]?.name;
-      if (photoResourceName) {
-        const uri = await resolvePhotoUri(photoResourceName);
-        if (uri) {
-          record.photo_url = uri;
+      const photoResourceNames = (place.photos || [])
+        .slice(0, isPhotoPickerEnabled() ? PHOTO_CANDIDATES : 1)
+        .map((p) => p.name)
+        .filter(Boolean);
+      if (photoResourceNames.length) {
+        // Resolve all candidates to URIs in parallel — each is one
+        // billed Places photo-media call.
+        const uris = (await Promise.all(
+          photoResourceNames.map((n) => resolvePhotoUri(n).catch(() => null))
+        )).filter(Boolean);
+        if (uris.length) {
+          const pick = isPhotoPickerEnabled() && uris.length > 1
+            ? await pickBestPhoto(uris)
+            : { index: 0, kind: "top" };
+          record.photo_url = uris[pick.index] || uris[0];
           record.status = "ok";
+          record.kind = pick.kind;
         }
       }
     }
@@ -184,9 +214,17 @@ export function photoFetcherStats() {
       SUM(CASE WHEN status = 'error'     THEN 1 ELSE 0 END) AS errors
     FROM place_photos
   `).get();
+  const kinds = db.prepare(`
+    SELECT COALESCE(kind, 'unlabeled') AS kind, COUNT(*) AS n
+    FROM place_photos
+    WHERE status = 'ok'
+    GROUP BY COALESCE(kind, 'unlabeled')
+  `).all();
   return {
     enabled: !!API_KEY && process.env.PHOTO_FETCHER === "google_places",
+    picker: isPhotoPickerEnabled() ? { model: process.env.PHOTO_PICKER_MODEL || "claude-haiku-4-5" } : { model: null },
     ...row,
+    kinds: Object.fromEntries(kinds.map((k) => [k.kind, k.n])),
   };
 }
 
