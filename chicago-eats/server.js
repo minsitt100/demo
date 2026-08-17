@@ -181,6 +181,15 @@ const activeSourceIds = new Set(sources.map((s) => s.meta.id));
 const USE_LLM_VALIDATOR =
   process.env.VALIDATOR === "llm" && !!process.env.ANTHROPIC_API_KEY;
 
+const USE_PHOTO_FETCHER =
+  process.env.PHOTO_FETCHER === "google_places" && !!process.env.GOOGLE_PLACES_API_KEY;
+
+// A shared OG image spread across this many restaurants is treated as a
+// "roundup collision" (one article's hero photo bleeding onto every
+// restaurant it mentions). Below the threshold, the OG image is probably
+// a real hero photo of the single restaurant covered.
+const SHARED_IMAGE_THRESHOLD = 3;
+
 async function aggregateRestaurants(openings) {
   const map = new Map(); // normalized name -> aggregate
 
@@ -304,6 +313,34 @@ async function aggregateRestaurants(openings) {
     queueForValidation(uncached, contexts);
   }
 
+  // Duplicate-image fix. Count how many restaurants share each OG image;
+  // any image shared across SHARED_IMAGE_THRESHOLD+ restaurants is a
+  // roundup collision (one article's hero photo attached to every
+  // restaurant it mentioned). Route those to Google Places for a real
+  // per-restaurant photo. Cache-hit swaps the URL now; cache-miss keeps
+  // the OG image on this render and warms the cache for the next reload.
+  if (USE_PHOTO_FETCHER && candidates.length) {
+    const { findPhotoFromCache, queueForPhotoFetch } = await import("./sources/photo-fetcher.js");
+    const imgCounts = new Map();
+    for (const c of candidates) {
+      if (c.imageUrl) imgCounts.set(c.imageUrl, (imgCounts.get(c.imageUrl) || 0) + 1);
+    }
+    const toFetch = [];
+    for (const c of candidates) {
+      const shared = c.imageUrl && (imgCounts.get(c.imageUrl) || 0) >= SHARED_IMAGE_THRESHOLD;
+      const missing = !c.imageUrl;
+      if (!shared && !missing) continue;
+      const neighborhood = [...c.neighborhoods][0] || null;
+      const cached = findPhotoFromCache(c.name, neighborhood);
+      if (cached?.status === "ok" && cached.photo_url) {
+        c.imageUrl = cached.photo_url;
+      } else if (!cached) {
+        toFetch.push({ name: c.name, neighborhood });
+      }
+    }
+    queueForPhotoFetch(toFetch);
+  }
+
   return candidates
     .map((a) => {
       const cuisines = [...a.cuisines.values()];
@@ -332,7 +369,7 @@ async function aggregateRestaurants(openings) {
     );
 }
 
-app.get("/api/status", (_req, res) => {
+app.get("/api/status", async (_req, res) => {
   const cutoff = cutoffIso();
   const extractor =
     process.env.EXTRACTOR === "llm" && process.env.ANTHROPIC_API_KEY
@@ -341,11 +378,17 @@ app.get("/api/status", (_req, res) => {
   const validator = USE_LLM_VALIDATOR
     ? { mode: "llm", model: process.env.VALIDATOR_MODEL || "claude-haiku-4-5" }
     : { mode: "regex", model: null };
+  let photoFetcher = { enabled: false };
+  if (USE_PHOTO_FETCHER) {
+    const { photoFetcherStats } = await import("./sources/photo-fetcher.js");
+    photoFetcher = photoFetcherStats();
+  }
   res.json({
     total: dbApi.count({ cutoff }),
     maxAgeDays: MAX_AGE_DAYS,
     extractor,
     validator,
+    photoFetcher,
     recentRuns: dbApi.recentRuns(),
     sourceStats: dbApi.sourceStats(),
     sources: sources.map((s) => ({ id: s.meta.id, label: s.meta.label })),

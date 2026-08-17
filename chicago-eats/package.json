@@ -12,6 +12,7 @@
     "verify:urls": "node scripts/verify-urls.js",
     "enrich:restaurants": "node scripts/enrich-restaurants.js",
     "backfill:images": "node scripts/backfill-images.js",
+    "backfill:photos": "node scripts/backfill-photos.js",
     "peek:feed": "node scripts/peek-feed.js",
     "debug:extract": "node scripts/debug-extract.js"
   },
