@@ -362,22 +362,21 @@ function renderActiveFilters() {
   const list = $("#active-filters-list");
   if (entries.length === 0) {
     wrap.hidden = true;
+    list.innerHTML = "";
     return;
   }
   wrap.hidden = false;
+  // The whole chip is clickable to remove — makes the ✕ target much
+  // larger and forgiving on touch devices. The <button> stays as the
+  // accessible tap target and visual affordance.
   list.innerHTML = entries.map((e) =>
-    `<span class="active-filter-chip" data-filter="${e.filter}" data-value="${escapeHtml(String(e.value))}">
+    `<span class="active-filter-chip" role="button" tabindex="0"
+           data-filter="${escapeHtml(e.filter)}" data-value="${escapeHtml(String(e.value))}"
+           aria-label="Remove filter: ${escapeHtml(e.label)}">
       ${escapeHtml(e.label)}
-      <button class="x" aria-label="Remove ${escapeHtml(e.label)}">×</button>
+      <button class="x" tabindex="-1" aria-hidden="true">×</button>
     </span>`
   ).join("");
-  $$(".active-filter-chip .x", list).forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const chip = btn.parentElement;
-      removeActiveFilter(chip.dataset.filter, chip.dataset.value);
-    });
-  });
 }
 
 function removeActiveFilter(filter, value) {
@@ -500,8 +499,29 @@ document.addEventListener("click", (e) => {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeDropdown();
 });
-// Clear Filters
-$("#clear-filters").addEventListener("click", () => clearAllFilters());
+// Active-filter chips — event delegation on the list, so newly-rendered
+// chips always work without re-attaching per render. Clicking anywhere
+// on a chip (or its ✕) removes that filter.
+$("#active-filters-list").addEventListener("click", (e) => {
+  const chip = e.target.closest(".active-filter-chip");
+  if (!chip) return;
+  e.stopPropagation();
+  removeActiveFilter(chip.dataset.filter, chip.dataset.value);
+});
+// Keyboard support: Enter/Space on a chip removes it.
+$("#active-filters-list").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const chip = e.target.closest(".active-filter-chip");
+  if (!chip) return;
+  e.preventDefault();
+  removeActiveFilter(chip.dataset.filter, chip.dataset.value);
+});
+
+// Clear Filters — wipe every filter state back to defaults.
+$("#clear-filters").addEventListener("click", (e) => {
+  e.stopPropagation();
+  clearAllFilters();
+});
 
 $("#refresh-btn").addEventListener("click", async () => {
   const btn = $("#refresh-btn");
