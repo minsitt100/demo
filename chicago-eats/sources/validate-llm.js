@@ -116,6 +116,36 @@ export async function validateBatch(names, contexts = {}, { concurrency = 4 } = 
   return results;
 }
 
+// Synchronous cache-only lookup. Returns null on a miss so callers can
+// distinguish "not yet validated" from "validated and invalid."
+export function validateFromCache(name) {
+  if (!name) return null;
+  const key = name.toLowerCase().trim();
+  return cache.has(key) ? cache.get(key) : null;
+}
+
+// Fire-and-forget background validation. Runs on the next event loop tick
+// and populates the cache; the current request path never awaits it.
+// De-duplicates: names already cached or currently in-flight are skipped.
+const inFlight = new Set();
+export function queueForValidation(names, contexts = {}) {
+  const todo = names.filter((n) => {
+    if (!n) return false;
+    const k = n.toLowerCase().trim();
+    if (cache.has(k) || inFlight.has(k)) return false;
+    inFlight.add(k);
+    return true;
+  });
+  if (!todo.length) return;
+  setImmediate(async () => {
+    try {
+      await validateBatch(todo, contexts, { concurrency: 3 });
+    } finally {
+      for (const n of todo) inFlight.delete(n.toLowerCase().trim());
+    }
+  });
+}
+
 export function validatorStats() {
   return { cacheSize: cache.size, hits, misses, failures, model: MODEL };
 }

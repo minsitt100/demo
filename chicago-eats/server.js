@@ -218,20 +218,25 @@ async function aggregateRestaurants(openings) {
     // openings — per the site's rule, we don't surface those.
     .filter((a) => a.sources.some((s) => s.status === "opening"));
 
-  // LLM-driven validation when opted in. Runs concurrently with a bounded
-  // worker pool; results cached across requests so this only pays real
-  // API cost on the first aggregation after a scrape brought in new names.
+  // LLM-driven validation when opted in. The request path is instant —
+  // we consult the in-memory cache synchronously and enqueue any misses
+  // for background validation on the next event loop tick. Names not yet
+  // validated fail OPEN (shown), so first-load quality is at parity with
+  // regex-only. On subsequent reloads (after the background workers have
+  // run), invalid names disappear.
   if (USE_LLM_VALIDATOR && candidates.length) {
-    const { validateBatch } = await import("./sources/validate-llm.js");
-    const names = candidates.map((c) => c.name);
-    const contexts = Object.fromEntries(
-      candidates.map((c) => [c.name, { articleTitle: c.sources[0]?.title }])
-    );
-    const results = await validateBatch(names, contexts);
+    const { validateFromCache, queueForValidation } = await import("./sources/validate-llm.js");
+    const uncached = [];
+    const contexts = {};
     candidates = candidates.filter((c) => {
-      const v = results.get(c.name);
-      return v ? v.valid : true; // if lookup missed for any reason, keep
+      const cached = validateFromCache(c.name);
+      if (cached) return cached.valid;
+      // Not yet cached — keep it visible for now and queue for background
+      uncached.push(c.name);
+      contexts[c.name] = { articleTitle: c.sources[0]?.title };
+      return true;
     });
+    queueForValidation(uncached, contexts);
   }
 
   return candidates
