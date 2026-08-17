@@ -28,34 +28,44 @@ function getClient() {
 const OUTPUT_SCHEMA = {
   type: "object",
   properties: {
-    index: { type: "integer", minimum: 0 },
+    // -1 signals "no food / drink / food-prep photo in the candidates"
+    // so the caller can fall back to the OG image instead of showing
+    // yet another interior shot.
+    index: { type: "integer", minimum: -1 },
     kind: {
       type: "string",
-      enum: ["food", "drink", "interior", "exterior", "menu", "other"],
+      enum: ["food", "drink", "food_scene", "interior", "exterior", "menu", "other", "none"],
     },
   },
   required: ["index", "kind"],
   additionalProperties: false,
 };
 
-const SYSTEM_PROMPT = `You rank candidate photos from a restaurant's Google Places listing. Pick the ONE that best represents what a diner would want to eat or drink there.
+const SYSTEM_PROMPT = `You rank photos from a restaurant's Google Places listing. Your ONE job is to find a food photo.
 
-Priority order:
-1. A plated dish, close-up of food, or table with multiple dishes
-2. A cocktail, coffee, or notable drink
-3. A bakery/pastry case with visible food items
-4. Ingredients or open-kitchen action shots that show food
+ACCEPT — return that photo's index and its kind:
+- "food": a plated dish, close-up of food, a table with dishes, pastries or bread visible in a case, ice cream, sushi, a burger, pizza, ramen, salad, dessert, ANY prepared food item
+- "drink": a cocktail, glass of wine, coffee, latte art, beer, notable beverage
+- "food_scene": open-kitchen plating action, ingredients being prepped, a chef holding a dish, food being served
 
-If NONE of the photos show food or drink, pick the one that best captures the interior atmosphere (dining room, bar, decor) — not exteriors, logos, menus, empty rooms, or staff portraits.
+REJECT — return index = -1, kind = "none":
+- Interior dining rooms, bar decor, empty tables, banquettes, light fixtures
+- Exterior storefronts, awnings, signs, patios, street views
+- Logos, menus, receipts, chalkboards, price lists
+- Staff portraits, groups of diners, event photos
+- Blurry, dark, or unclear shots
 
-Return the 0-based index of your pick along with a "kind" label describing what it shows.`;
+Be strict. Even a mediocre food photo beats the most beautiful interior. Only return -1 if you are certain that NONE of the candidate photos show food, drink, or food preparation. Look at every single candidate before deciding.`;
 
-// Pick the best photo from a list of candidate URLs. Returns
-// { index, kind }. On any error, returns { index: 0, kind: "unknown" }
-// so the caller can fall back to Google's own top pick.
+// Pick the best food photo from a list of candidate URLs. Returns
+// { index, kind }:
+//   index >= 0        → a food/drink/food_scene photo at that position
+//   index === -1      → no food photo in the candidates; caller should
+//                       fall back to the OG image (kind === "none")
+// On any picker error, returns { index: -1, kind: "picker_error" } so
+// we DON'T lock in a random interior — the caller keeps the OG image.
 export async function pickBestPhoto(uris) {
-  if (!uris?.length) return { index: 0, kind: "none" };
-  if (uris.length === 1) return { index: 0, kind: "only" };
+  if (!uris?.length) return { index: -1, kind: "none" };
 
   const content = [{ type: "text", text: "Here are the candidate photos, numbered from 0:" }];
   for (let i = 0; i < uris.length; i++) {
@@ -66,7 +76,7 @@ export async function pickBestPhoto(uris) {
   try {
     const response = await getClient().messages.create({
       model: MODEL,
-      max_tokens: 120,
+      max_tokens: 150,
       system: [{
         type: "text",
         text: SYSTEM_PROMPT,
@@ -78,13 +88,18 @@ export async function pickBestPhoto(uris) {
       messages: [{ role: "user", content }],
     });
     const block = response.content.find((b) => b.type === "text");
-    if (!block) return { index: 0, kind: "no-response" };
+    if (!block) return { index: -1, kind: "no-response" };
     const parsed = JSON.parse(block.text);
-    if (parsed.index >= 0 && parsed.index < uris.length) return parsed;
-    return { index: 0, kind: "bad-index" };
+    // Strict acceptance: only food/drink/food_scene count as picks.
+    // Anything else (interior/exterior/menu/other) is treated as "no food."
+    const FOOD_KINDS = new Set(["food", "drink", "food_scene"]);
+    if (parsed.index >= 0 && parsed.index < uris.length && FOOD_KINDS.has(parsed.kind)) {
+      return parsed;
+    }
+    return { index: -1, kind: parsed.kind || "none" };
   } catch (err) {
     console.warn(`[photo-picker] ${uris.length} candidates failed: ${err.message}`);
-    return { index: 0, kind: "picker_error" };
+    return { index: -1, kind: "picker_error" };
   }
 }
 

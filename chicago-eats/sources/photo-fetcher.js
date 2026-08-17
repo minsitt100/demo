@@ -29,10 +29,15 @@ const CHICAGO_CENTER = { latitude: 41.8781, longitude: -87.6298 };
 const SEARCH_RADIUS_M = 25000; // 25 km covers all of Chicago + inner suburbs
 const PHOTO_MAX_HEIGHT = 800;
 // Number of photos to consider per restaurant. Google Places returns up
-// to 10 in ranked order; we pull the top N URIs and let the picker rank
-// them for food-forwardness. Higher N = better food-photo hit rate but
-// more Places photo-media calls billed. 5 is the sweet spot.
-const PHOTO_CANDIDATES = parseInt(process.env.PHOTO_CANDIDATES, 10) || 5;
+// to 10 in ranked order (that's the API ceiling per place). We resolve
+// all of them so the picker can find a food shot even when Google's
+// top-ranked photos are all interior/exterior. More candidates = more
+// Places photo-media calls billed (~$0.007 each) but a much higher
+// food-photo hit rate. Cap at 10 — the max Google exposes.
+const PHOTO_CANDIDATES = Math.min(
+  parseInt(process.env.PHOTO_CANDIDATES, 10) || 10,
+  10
+);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS place_photos (
@@ -159,12 +164,25 @@ export async function fetchPhotoNow(name, neighborhood) {
           photoResourceNames.map((n) => resolvePhotoUri(n).catch(() => null))
         )).filter(Boolean);
         if (uris.length) {
-          const pick = isPhotoPickerEnabled() && uris.length > 1
-            ? await pickBestPhoto(uris)
-            : { index: 0, kind: "top" };
-          record.photo_url = uris[pick.index] || uris[0];
-          record.status = "ok";
-          record.kind = pick.kind;
+          if (isPhotoPickerEnabled()) {
+            const pick = await pickBestPhoto(uris);
+            if (pick.index >= 0) {
+              record.photo_url = uris[pick.index];
+              record.status = "ok";
+              record.kind = pick.kind;
+            } else {
+              // No food photo among the candidates. Mark it so the
+              // aggregator falls back to the article's OG image rather
+              // than showing yet another interior shot.
+              record.status = "no_food";
+              record.kind = pick.kind || "none";
+            }
+          } else {
+            // Picker disabled — use Google's top-ranked photo as-is.
+            record.photo_url = uris[0];
+            record.status = "ok";
+            record.kind = "top";
+          }
         }
       }
     }

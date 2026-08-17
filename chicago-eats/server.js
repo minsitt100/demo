@@ -334,6 +334,9 @@ async function aggregateRestaurants(openings) {
       const cached = findPhotoFromCache(c.name, neighborhood);
       if (cached?.status === "ok" && cached.photo_url) {
         c.imageUrl = cached.photo_url;
+      } else if (cached && (cached.status === "no_food" || cached.status === "not_found" || cached.status === "error")) {
+        // Already tried Google Places — nothing food-forward available.
+        // Keep the article's OG image (even if shared) as the fallback.
       } else if (!cached) {
         toFetch.push({ name: c.name, neighborhood });
       }

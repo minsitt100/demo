@@ -14,12 +14,27 @@
 //   THRESHOLD=N  Override the shared-image threshold (default 3).
 //   LIMIT=N      Cap the number of restaurants processed this run.
 
-import { dbApi } from "../db.js";
+import db, { dbApi } from "../db.js";
 import { fetchPhotoNow, photoFetcherStats } from "../sources/photo-fetcher.js";
 
 const ALL = process.env.ALL === "1";
 const THRESHOLD = parseInt(process.env.THRESHOLD, 10) || 3;
 const LIMIT = parseInt(process.env.LIMIT, 10) || Infinity;
+const RERANK = process.env.RERANK === "1";
+
+// RERANK=1 clears cache rows whose picked kind is NOT food/drink/food_scene
+// (or is a pre-picker "top"/"only"/"unlabeled" row from an older run) so
+// the backfill re-picks them with the current strict picker. Only touches
+// the photo cache — no restaurant data is affected.
+if (RERANK) {
+  const info = db.prepare(`
+    DELETE FROM place_photos
+    WHERE kind IS NULL
+       OR kind NOT IN ('food', 'drink', 'food_scene')
+  `).run();
+  console.log(`RERANK=1: cleared ${info.changes} non-food cache entries`);
+  console.log("");
+}
 
 if (!process.env.GOOGLE_PLACES_API_KEY) {
   console.error("GOOGLE_PLACES_API_KEY not set. Aborting.");
@@ -86,7 +101,7 @@ console.log(`total restaurants in window: ${restaurants.length}`);
 console.log(`backfill targets:            ${targets.length}${ALL ? " (ALL)" : ` (shared-image ≥${THRESHOLD} or missing)`}`);
 console.log("");
 
-let ok = 0, notFound = 0, errored = 0, cached = 0;
+let ok = 0, noFood = 0, notFound = 0, errored = 0, cached = 0;
 for (let i = 0; i < targets.length; i++) {
   const r = targets[i];
   const nbhd = [...r.neighborhoods][0] || null;
@@ -96,15 +111,17 @@ for (let i = 0; i < targets.length; i++) {
   const wasCached = after === before;
   if (wasCached) cached++;
   else if (result.status === "ok") ok++;
+  else if (result.status === "no_food") noFood++;
   else if (result.status === "not_found") notFound++;
   else errored++;
   const flag =
     result.status === "ok" ? "✓" :
+    result.status === "no_food" ? "○" :
     result.status === "not_found" ? "·" : "✗";
-  const label = wasCached ? "cache" : result.status;
-  console.log(`${String(i + 1).padStart(3)}/${targets.length}  ${flag}  [${label.padEnd(9)}]  ${r.name}${nbhd ? ` — ${nbhd}` : ""}`);
+  const label = wasCached ? "cache" : `${result.status}${result.kind ? `/${result.kind}` : ""}`;
+  console.log(`${String(i + 1).padStart(3)}/${targets.length}  ${flag}  [${label.padEnd(18)}]  ${r.name}${nbhd ? ` — ${nbhd}` : ""}`);
 }
 
 console.log("");
-console.log(`done: ${ok} new, ${cached} already cached, ${notFound} not found, ${errored} errors`);
+console.log(`done: ${ok} food, ${noFood} no-food (kept OG), ${cached} cached, ${notFound} not on Places, ${errored} errors`);
 console.log(`cache size: ${photoFetcherStats().total}`);
