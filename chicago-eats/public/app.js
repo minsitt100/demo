@@ -1,10 +1,25 @@
 // ---------- state ----------
 const state = {
-  cuisine: "",
+  filters: {
+    cuisine: new Set(),          // multi-select
+    price: new Set(),            // multi-select
+    neighborhood: new Set(),     // multi-select
+    timePeriod: 90,              // days: 7 | 30 | 90 (default)
+  },
   maxAgeDays: null,
   restaurants: [],
-  cuisines: [],
+  options: {                      // populated from data
+    cuisines: [],
+    prices: ["$", "$$", "$$$", "$$$$"],
+    neighborhoods: [],
+    timePeriods: [
+      { label: "Past 7 days", value: 7 },
+      { label: "Past 30 days", value: 30 },
+      { label: "Past 90 days", value: 90 },
+    ],
+  },
   expanded: new Set(),
+  openDropdown: null,             // which filter's dropdown is open
 };
 
 // ---------- helpers ----------
@@ -70,9 +85,19 @@ async function api(path, opts = {}) {
 
 // ---------- rendering ----------
 function currentFiltered() {
-  const list = state.restaurants;
-  if (!state.cuisine) return list;
-  return list.filter((r) => r.cuisine === state.cuisine);
+  const { cuisine, price, neighborhood, timePeriod } = state.filters;
+  const now = Date.now();
+  const cutoffMs = now - timePeriod * 86400 * 1000;
+  return state.restaurants.filter((r) => {
+    if (cuisine.size && !cuisine.has(r.cuisine)) return false;
+    if (price.size && !price.has(r.priceBand)) return false;
+    if (neighborhood.size && !(r.neighborhoods || []).some((n) => neighborhood.has(n))) return false;
+    if (r.firstSeen) {
+      const ts = new Date(r.firstSeen).getTime();
+      if (!isNaN(ts) && ts < cutoffMs) return false;
+    }
+    return true;
+  });
 }
 
 function renderGrid() {
@@ -207,27 +232,178 @@ function toggleExpanded(id) {
 
 function renderCounts() {
   const total = currentFiltered().length;
-  const window = state.maxAgeDays ? ` · past ${state.maxAgeDays} days` : "";
+  const period = state.options.timePeriods.find((t) => t.value === state.filters.timePeriod);
+  const window = period ? ` · ${period.label.toLowerCase()}` : "";
   $("#counts").textContent =
     `${total} restaurant${total === 1 ? "" : "s"}${window}`;
 }
 
-function renderCuisineFilters() {
-  const wrap = $("#cuisine-filters");
-  const cuisines = state.cuisines;
-  wrap.innerHTML =
-    `<button class="chip is-active" data-cuisine="">All cuisines</button>` +
-    cuisines.map((c) =>
-      `<button class="chip" data-cuisine="${escapeHtml(c)}">${(CUISINE_EMOJI[c] || "")} ${escapeHtml(c)}</button>`
-    ).join("");
-  $$(".chip", wrap).forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.cuisine = btn.dataset.cuisine;
-      $$(".chip", wrap).forEach((b) => b.classList.toggle("is-active", b === btn));
-      renderGrid();
-      renderCounts();
+// ---------- filter pills + dropdowns ----------
+function pillLabels() {
+  const { cuisine, price, neighborhood, timePeriod } = state.filters;
+  return {
+    cuisine: cuisine.size === 0 ? "All cuisines" : [...cuisine][0],
+    cuisineBadge: cuisine.size > 1 ? `+${cuisine.size - 1}` : null,
+    price: price.size === 0 ? "Any price" : [...price].join(" · "),
+    priceBadge: null,
+    neighborhood: neighborhood.size === 0 ? "All neighborhoods" : [...neighborhood][0],
+    neighborhoodBadge: neighborhood.size > 1 ? `+${neighborhood.size - 1}` : null,
+    time: state.options.timePeriods.find((t) => t.value === timePeriod)?.label || `Past ${timePeriod} days`,
+  };
+}
+
+function renderFilterPills() {
+  const labels = pillLabels();
+  const wraps = $$(".filter-pill-wrap");
+  for (const wrap of wraps) {
+    const filter = wrap.dataset.filter;
+    const pill = wrap.querySelector(".filter-pill");
+    const labelEl = pill.querySelector(".pill-label");
+    const badge = pill.querySelector(".pill-badge");
+    labelEl.textContent = labels[filter];
+    const badgeText = labels[filter + "Badge"];
+    if (badge) {
+      badge.hidden = !badgeText;
+      badge.textContent = badgeText || "";
+    }
+  }
+}
+
+function renderDropdown(filter) {
+  const wrap = document.querySelector(`.filter-pill-wrap[data-filter="${filter}"]`);
+  const dropdown = wrap.querySelector(".filter-dropdown");
+  let optionsHtml = "";
+
+  if (filter === "cuisine") {
+    const list = state.options.cuisines;
+    if (!list.length) return `<div class="dropdown-empty">No cuisines yet</div>`;
+    optionsHtml = list.map((c) => {
+      const selected = state.filters.cuisine.has(c);
+      return `<button type="button" class="dropdown-option ${selected ? "is-selected" : ""}" data-value="${escapeHtml(c)}"><span class="check">✓</span>${(CUISINE_EMOJI[c] || "")} ${escapeHtml(c)}</button>`;
+    }).join("");
+  } else if (filter === "price") {
+    optionsHtml = state.options.prices.map((p) => {
+      const selected = state.filters.price.has(p);
+      return `<button type="button" class="dropdown-option ${selected ? "is-selected" : ""}" data-value="${escapeHtml(p)}"><span class="check">✓</span>${escapeHtml(p)}</button>`;
+    }).join("");
+  } else if (filter === "neighborhood") {
+    const list = state.options.neighborhoods;
+    if (!list.length) return `<div class="dropdown-empty">No neighborhoods yet</div>`;
+    optionsHtml = list.map((n) => {
+      const selected = state.filters.neighborhood.has(n);
+      return `<button type="button" class="dropdown-option ${selected ? "is-selected" : ""}" data-value="${escapeHtml(n)}"><span class="check">✓</span>${escapeHtml(n)}</button>`;
+    }).join("");
+  } else if (filter === "time") {
+    optionsHtml = state.options.timePeriods.map((t) => {
+      const selected = state.filters.timePeriod === t.value;
+      return `<button type="button" class="dropdown-option ${selected ? "is-selected" : ""}" data-value="${t.value}"><span class="check">✓</span>${escapeHtml(t.label)}</button>`;
+    }).join("");
+  }
+  dropdown.innerHTML = optionsHtml;
+  // Bind option clicks
+  $$(".dropdown-option", dropdown).forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const value = btn.dataset.value;
+      handleOptionClick(filter, value);
     });
   });
+}
+
+function handleOptionClick(filter, value) {
+  if (filter === "time") {
+    state.filters.timePeriod = parseInt(value, 10);
+    closeDropdown();
+  } else {
+    const set = state.filters[filter];
+    if (set.has(value)) set.delete(value);
+    else set.add(value);
+  }
+  refreshUI();
+}
+
+function openDropdown(filter) {
+  closeDropdown();
+  state.openDropdown = filter;
+  const wrap = document.querySelector(`.filter-pill-wrap[data-filter="${filter}"]`);
+  const pill = wrap.querySelector(".filter-pill");
+  const dropdown = wrap.querySelector(".filter-dropdown");
+  renderDropdown(filter);
+  dropdown.hidden = false;
+  pill.classList.add("is-open");
+}
+
+function closeDropdown() {
+  if (!state.openDropdown) return;
+  const wrap = document.querySelector(`.filter-pill-wrap[data-filter="${state.openDropdown}"]`);
+  if (wrap) {
+    wrap.querySelector(".filter-dropdown").hidden = true;
+    wrap.querySelector(".filter-pill").classList.remove("is-open");
+  }
+  state.openDropdown = null;
+}
+
+// ---------- active filters strip ----------
+function activeFilterEntries() {
+  const entries = [];
+  for (const c of state.filters.cuisine) entries.push({ filter: "cuisine", value: c, label: c });
+  for (const p of state.filters.price) entries.push({ filter: "price", value: p, label: p });
+  for (const n of state.filters.neighborhood) entries.push({ filter: "neighborhood", value: n, label: n });
+  if (state.filters.timePeriod !== 90) {
+    const t = state.options.timePeriods.find((x) => x.value === state.filters.timePeriod);
+    if (t) entries.push({ filter: "time", value: t.value, label: t.label });
+  }
+  return entries;
+}
+
+function renderActiveFilters() {
+  const entries = activeFilterEntries();
+  const wrap = $("#active-filters");
+  const list = $("#active-filters-list");
+  if (entries.length === 0) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  list.innerHTML = entries.map((e) =>
+    `<span class="active-filter-chip" data-filter="${e.filter}" data-value="${escapeHtml(String(e.value))}">
+      ${escapeHtml(e.label)}
+      <button class="x" aria-label="Remove ${escapeHtml(e.label)}">×</button>
+    </span>`
+  ).join("");
+  $$(".active-filter-chip .x", list).forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const chip = btn.parentElement;
+      removeActiveFilter(chip.dataset.filter, chip.dataset.value);
+    });
+  });
+}
+
+function removeActiveFilter(filter, value) {
+  if (filter === "time") {
+    state.filters.timePeriod = 90;  // reset to default
+  } else {
+    state.filters[filter].delete(value);
+  }
+  refreshUI();
+}
+
+function clearAllFilters() {
+  state.filters.cuisine.clear();
+  state.filters.price.clear();
+  state.filters.neighborhood.clear();
+  state.filters.timePeriod = 90;
+  refreshUI();
+}
+
+function refreshUI() {
+  renderFilterPills();
+  renderActiveFilters();
+  renderGrid();
+  renderCounts();
+  // If a dropdown is open, re-render it to reflect the new selection state
+  if (state.openDropdown) renderDropdown(state.openDropdown);
 }
 
 function renderSourceStatus(runs, sourceStats, extractor, validator) {
@@ -289,19 +465,44 @@ async function loadRestaurants() {
     const res = await api("/api/restaurants");
     state.restaurants = res.restaurants || [];
     state.maxAgeDays = res.maxAgeDays || state.maxAgeDays;
-    // Collect unique cuisines for filter chips.
+    // Collect unique option lists for the filter dropdowns.
     const cuisineSet = new Set();
-    for (const r of state.restaurants) if (r.cuisine) cuisineSet.add(r.cuisine);
-    state.cuisines = [...cuisineSet].sort();
-    renderCuisineFilters();
-    renderGrid();
-    renderCounts();
+    const nbhdSet = new Set();
+    for (const r of state.restaurants) {
+      if (r.cuisine) cuisineSet.add(r.cuisine);
+      for (const n of r.neighborhoods || []) if (n) nbhdSet.add(n);
+    }
+    state.options.cuisines = [...cuisineSet].sort();
+    state.options.neighborhoods = [...nbhdSet].sort();
+    refreshUI();
   } catch (e) {
     grid.innerHTML = `<div class="empty"><h3>Couldn't load restaurants.</h3><p>${escapeHtml(e.message)}</p></div>`;
   }
 }
 
 // ---------- events ----------
+// Filter pill clicks toggle their dropdown
+$$(".filter-pill-wrap").forEach((wrap) => {
+  const filter = wrap.dataset.filter;
+  const pill = wrap.querySelector(".filter-pill");
+  pill.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (state.openDropdown === filter) closeDropdown();
+    else openDropdown(filter);
+  });
+});
+// Click outside any dropdown closes it
+document.addEventListener("click", (e) => {
+  if (!state.openDropdown) return;
+  if (!e.target.closest(".filter-pill-wrap")) closeDropdown();
+});
+// Esc closes the open dropdown
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeDropdown();
+});
+// Clear Filters
+$("#clear-filters").addEventListener("click", () => clearAllFilters());
+
 $("#refresh-btn").addEventListener("click", async () => {
   const btn = $("#refresh-btn");
   btn.classList.add("is-loading");

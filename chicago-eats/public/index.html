@@ -33,11 +33,50 @@
     </header>
 
     <main class="container">
-      <section class="filter-bar">
-        <div class="filters">
-          <div class="filter-group" id="cuisine-filters">
-            <button class="chip is-active" data-cuisine="">All cuisines</button>
+      <section class="filters-section">
+        <h2 class="filters-heading">Filters</h2>
+        <div class="filter-pills" id="filter-pills">
+          <div class="filter-pill-wrap" data-filter="cuisine">
+            <label>Cuisine</label>
+            <button class="filter-pill" type="button">
+              <span class="pill-label">All cuisines</span>
+              <span class="pill-badge" hidden></span>
+              <span class="pill-chev" aria-hidden="true">▾</span>
+            </button>
+            <div class="filter-dropdown" hidden></div>
           </div>
+          <div class="filter-pill-wrap" data-filter="time">
+            <label>Time Period</label>
+            <button class="filter-pill" type="button">
+              <span class="pill-icon" aria-hidden="true">📅</span>
+              <span class="pill-label">Past 90 days</span>
+              <span class="pill-chev" aria-hidden="true">▾</span>
+            </button>
+            <div class="filter-dropdown" hidden></div>
+          </div>
+          <div class="filter-pill-wrap" data-filter="price">
+            <label>Price</label>
+            <button class="filter-pill" type="button">
+              <span class="pill-label">Any price</span>
+              <span class="pill-badge" hidden></span>
+              <span class="pill-chev" aria-hidden="true">▾</span>
+            </button>
+            <div class="filter-dropdown" hidden></div>
+          </div>
+          <div class="filter-pill-wrap" data-filter="neighborhood">
+            <label>Neighborhood</label>
+            <button class="filter-pill" type="button">
+              <span class="pill-label">All neighborhoods</span>
+              <span class="pill-badge" hidden></span>
+              <span class="pill-chev" aria-hidden="true">▾</span>
+            </button>
+            <div class="filter-dropdown" hidden></div>
+          </div>
+        </div>
+        <div class="active-filters" id="active-filters" hidden>
+          <span class="active-filters-label">Active Filters</span>
+          <div class="active-filters-list" id="active-filters-list"></div>
+          <button class="clear-filters" id="clear-filters">Clear Filters</button>
         </div>
         <div class="counts" id="counts">—</div>
       </section>
