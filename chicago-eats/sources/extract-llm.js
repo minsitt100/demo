@@ -84,6 +84,39 @@ const OUTPUT_SCHEMA = {
   additionalProperties: false,
 };
 
+// Try to rescue a partially-generated JSON array. Walks the string looking
+// for the last complete `}` in what appears to be the restaurants array,
+// then re-closes the array and object. Returns null if it can't find a
+// safe truncation point. Only used when the primary JSON.parse() fails.
+function salvagePartialJson(raw) {
+  if (typeof raw !== "string") return null;
+  const arrStart = raw.indexOf('"restaurants"');
+  if (arrStart < 0) return null;
+  const openBracket = raw.indexOf("[", arrStart);
+  if (openBracket < 0) return null;
+  // Find the last complete object end before any unclosed string
+  let lastGoodEnd = -1;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = openBracket + 1; i < raw.length; i++) {
+    const c = raw[i];
+    if (inStr) {
+      if (esc) { esc = false; continue; }
+      if (c === "\\") { esc = true; continue; }
+      if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === "{") depth++;
+    else if (c === "}") { depth--; if (depth === 0) lastGoodEnd = i; }
+    else if (c === "]" && depth === 0) break;
+  }
+  if (lastGoodEnd < 0) return null;
+  const rebuilt = raw.slice(0, lastGoodEnd + 1) + "]}";
+  try { return JSON.parse(rebuilt); } catch { return null; }
+}
+
 // Extract restaurants from article HTML using Claude. Same return shape as
 // the regex extractor: [{name, cuisine?, blurb?}].
 export async function extractRestaurantsLLM(html, title = "") {
@@ -95,9 +128,11 @@ export async function extractRestaurantsLLM(html, title = "") {
     const response = await getClient().messages.create({
       model: MODEL,
       // Big structured outputs (25-restaurant guides, year-end lists) can
-      // exceed 2048 output tokens and truncate the JSON mid-array. Applies
-      // across all sources, not just Infatuation.
-      max_tokens: 8192,
+      // exceed 2048 output tokens and truncate the JSON mid-array. 16k
+      // covers even the longest Infatuation "best of" guides plus rich
+      // per-restaurant take/dishes on all-500-restaurant edge cases.
+      // Applies across all sources, not just Infatuation.
+      max_tokens: 16384,
       // System prompt as a cacheable text block — repeated identically across
       // every extraction call in a scrape, so cache reads pay ~0.1x the
       // per-token price of a cold call.
@@ -115,10 +150,22 @@ export async function extractRestaurantsLLM(html, title = "") {
       }],
     });
 
-    // structured outputs guarantee the first text block is valid JSON matching the schema
+    // structured outputs almost always return valid JSON, but on rare very-
+    // long responses the model can still emit a malformed string. Try to
+    // salvage the leading valid array before giving up on the article.
     const textBlock = response.content.find((b) => b.type === "text");
     if (!textBlock) return [];
-    const parsed = JSON.parse(textBlock.text);
+    let parsed;
+    try {
+      parsed = JSON.parse(textBlock.text);
+    } catch (parseErr) {
+      // Best-effort recovery: trim any trailing malformed characters back
+      // to the last valid `}` in the restaurants array and try again.
+      const salvaged = salvagePartialJson(textBlock.text);
+      if (!salvaged) throw parseErr;
+      parsed = salvaged;
+      console.warn(`[extract-llm] recovered ${parsed.restaurants?.length || 0} entries from a malformed response`);
+    }
     return (parsed.restaurants || []).filter((r) => r && r.name);
   } catch (err) {
     // Never break a scrape on an extraction failure — return empty and log.
