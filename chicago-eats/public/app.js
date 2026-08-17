@@ -139,10 +139,13 @@ function renderCard(r) {
     ` : ""}
     <footer class="rcard-foot">
       <span class="mention-count">${r.mentions} article${r.mentions === 1 ? "" : "s"}</span>
-      <button class="rcard-toggle" data-toggle="${id}">
-        ${isExpanded ? "Hide articles" : "Show articles"}
-        <span class="chev" aria-hidden="true">${isExpanded ? "▴" : "▾"}</span>
-      </button>
+      <span class="rcard-foot-actions">
+        <button class="rcard-hide" data-hide-name="${escapeHtml(r.name)}" title="Not a real restaurant / hide from feed">✕</button>
+        <button class="rcard-toggle" data-toggle="${id}">
+          ${isExpanded ? "Hide articles" : "Show articles"}
+          <span class="chev" aria-hidden="true">${isExpanded ? "▴" : "▾"}</span>
+        </button>
+      </span>
     </footer>
     <div class="rcard-expanded" ${isExpanded ? "" : "hidden"}>
       <h4 class="expanded-title">Referenced in</h4>
@@ -163,6 +166,29 @@ function renderCard(r) {
   el.querySelector(".rcard-toggle")?.addEventListener("click", (e) => {
     e.stopPropagation();
     toggleExpanded(id);
+  });
+  el.querySelector(".rcard-hide")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const name = e.currentTarget.dataset.hideName;
+    if (!confirm(`Hide "${name}" from your feed?`)) return;
+    try {
+      const res = await api("/api/restaurants/hide", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      toast(`Hidden (${res.hidden} article${res.hidden === 1 ? "" : "s"})`);
+      el.style.transition = "opacity 200ms, transform 200ms";
+      el.style.opacity = "0";
+      el.style.transform = "scale(0.98)";
+      setTimeout(() => {
+        el.remove();
+        loadStatus(); // refresh noise-per-source counts
+      }, 200);
+    } catch (err) {
+      toast("Hide failed");
+      console.warn(err);
+    }
   });
   el.addEventListener("click", () => toggleExpanded(id));
   return el;
@@ -199,7 +225,7 @@ function renderCuisineFilters() {
   });
 }
 
-function renderSourceStatus(runs) {
+function renderSourceStatus(runs, sourceStats, extractor) {
   const wrap = $("#footer-status");
   const list = $("#source-status");
   if (!runs || !runs.length) { wrap.hidden = true; return; }
@@ -209,12 +235,28 @@ function renderSourceStatus(runs) {
   for (const r of runs) {
     if (!latestBySource.has(r.source)) latestBySource.set(r.source, r);
   }
-  list.innerHTML = [...latestBySource.values()].map((r) => {
+  const statsBySource = new Map((sourceStats || []).map((s) => [s.source, s]));
+
+  // Header row: which extractor is currently running
+  const extractorLine = extractor
+    ? `<li class="extractor-line"><span>Extractor</span><span class="${extractor.mode === "llm" ? "ok" : ""}">${escapeHtml(extractor.mode)}${extractor.model ? ` · ${escapeHtml(extractor.model)}` : ""}</span></li>`
+    : "";
+
+  list.innerHTML = extractorLine + [...latestBySource.values()].map((r) => {
     const cls = r.error ? "err" : "ok";
     const detail = r.error
       ? `error: ${escapeHtml(r.error.slice(0, 40))}`
-      : `+${r.inserted} new (${r.fetched} scanned)`;
-    return `<li><span>${escapeHtml(r.source)}</span><span class="${cls}">${detail}</span></li>`;
+      : `+${r.inserted} new · ${r.fetched} scanned`;
+    // Noise ratio: hidden / total rows this source has produced
+    const stats = statsBySource.get(r.source);
+    let noiseBadge = "";
+    if (stats && stats.total > 0) {
+      const ratio = stats.hidden / stats.total;
+      const pct = Math.round(ratio * 100);
+      const noiseCls = pct >= 30 ? "err" : pct >= 10 ? "warn" : "faint";
+      noiseBadge = `<span class="noise ${noiseCls}" title="${stats.hidden} of ${stats.total} rows hidden">${pct}% hidden</span>`;
+    }
+    return `<li><span>${escapeHtml(r.source)}${noiseBadge}</span><span class="${cls}">${detail}</span></li>`;
   }).join("");
 }
 
@@ -223,7 +265,7 @@ async function loadStatus() {
   try {
     const s = await api("/api/status");
     state.maxAgeDays = s.maxAgeDays || null;
-    renderSourceStatus(s.recentRuns);
+    renderSourceStatus(s.recentRuns, s.sourceStats, s.extractor);
     if (s.recentRuns?.[0]?.finished_at) {
       $("#last-updated").textContent = "Updated " + relativeTime(s.recentRuns[0].finished_at);
     }

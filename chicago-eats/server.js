@@ -209,10 +209,16 @@ function aggregateRestaurants(openings) {
 
 app.get("/api/status", (_req, res) => {
   const cutoff = cutoffIso();
+  const extractor =
+    process.env.EXTRACTOR === "llm" && process.env.ANTHROPIC_API_KEY
+      ? { mode: "llm", model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5" }
+      : { mode: "regex", model: null };
   res.json({
     total: dbApi.count({ cutoff }),
     maxAgeDays: MAX_AGE_DAYS,
+    extractor,
     recentRuns: dbApi.recentRuns(),
+    sourceStats: dbApi.sourceStats(),
     sources: sources.map((s) => ({ id: s.meta.id, label: s.meta.label })),
   });
 });
@@ -246,6 +252,16 @@ app.post("/api/verify", async (_req, res) => {
 app.post("/api/openings/:id/hide", (req, res) => {
   const changed = dbApi.hide(req.params.id);
   res.json({ ok: changed > 0 });
+});
+
+// Hide a whole restaurant (used by the ✕ button on a grid card). Marks
+// every source article that mentions the name as hidden, so re-scrapes
+// don't re-surface it and the noise-per-source ratio reflects the fix.
+app.post("/api/restaurants/hide", express.json(), (req, res) => {
+  const name = String(req.body?.name || "").trim();
+  if (!name) return res.status(400).json({ ok: false, error: "name required" });
+  const hidden = dbApi.hideByRestaurantName(name);
+  res.json({ ok: true, hidden });
 });
 
 app.listen(PORT, () => {

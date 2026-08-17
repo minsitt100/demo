@@ -512,8 +512,47 @@ a { color: inherit; text-decoration: none; }
   justify-content: space-between;
   gap: 8px;
 }
-#source-status .ok  { color: #3a7a4d; }
-#source-status .err { color: var(--accent); }
+#source-status .ok    { color: #3a7a4d; }
+#source-status .err   { color: var(--accent); }
+#source-status .warn  { color: #a67908; }
+#source-status .faint { color: var(--ink-faint); }
+#source-status .noise {
+  font-size: 10px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+.extractor-line {
+  font-weight: 600;
+  border-color: var(--accent-soft);
+}
+.extractor-line span:last-child {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+
+.rcard-foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.rcard-hide {
+  background: transparent;
+  border: none;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  transition: color 160ms var(--ease), background 160ms var(--ease);
+}
+.rcard-hide:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
 
 /* -------- toast -------- */
 .toast {

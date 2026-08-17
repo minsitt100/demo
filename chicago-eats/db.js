@@ -111,6 +111,28 @@ const recentRunsStmt = db.prepare(`
   LIMIT 20
 `);
 
+// Per-source noise: how many rows we've hidden vs how many exist.
+// A high ratio means the extractor is producing junk from that source.
+const sourceStatsStmt = db.prepare(`
+  SELECT
+    source,
+    COUNT(*)                                       AS total,
+    SUM(CASE WHEN is_hidden = 1 THEN 1 ELSE 0 END) AS hidden
+  FROM openings
+  GROUP BY source
+`);
+
+// Bulk-hide every article row that mentions a given restaurant name.
+// Called when the user hides a restaurant card in the grid view.
+const bulkHideByRestaurantStmt = db.prepare(`
+  UPDATE openings SET is_hidden = 1
+  WHERE is_hidden = 0
+    AND (
+      LOWER(restaurant) = LOWER(?)
+      OR restaurants_mentioned LIKE '%' || ? || '%'
+    )
+`);
+
 export const dbApi = {
   insertMany(items) {
     const tx = db.transaction((rows) => {
@@ -191,6 +213,13 @@ export const dbApi = {
   },
   recentRuns() {
     return recentRunsStmt.all();
+  },
+  sourceStats() {
+    return sourceStatsStmt.all();
+  },
+  hideByRestaurantName(name) {
+    if (!name) return 0;
+    return bulkHideByRestaurantStmt.run(name, name).changes;
   },
 };
 
