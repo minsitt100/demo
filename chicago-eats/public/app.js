@@ -115,7 +115,12 @@ function renderCard(r) {
   const dishes = Array.isArray(r.topDishes) ? r.topDishes : [];
   const takeBody = r.take || r.blurb;
 
+  const imageHtml = r.imageUrl
+    ? `<div class="rcard-image"><img src="${escapeHtml(r.imageUrl)}" alt="" loading="lazy" onerror="this.parentElement.remove()"></div>`
+    : "";
+
   el.innerHTML = `
+    ${imageHtml}
     <header class="rcard-primary">
       <h3 class="rcard-name">${escapeHtml(r.name)}</h3>
       <div class="rcard-location">

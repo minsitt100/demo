@@ -205,6 +205,14 @@ export const dbApi = {
   hasUrl(url) {
     return !!db.prepare(`SELECT 1 FROM openings WHERE url = ?`).get(url);
   },
+  setImageUrl(id, url) {
+    return db.prepare(`UPDATE openings SET image_url = ? WHERE id = ?`).run(url, id).changes;
+  },
+  rowsMissingImages() {
+    return db.prepare(
+      `SELECT id, url FROM openings WHERE is_hidden = 0 AND (image_url IS NULL OR image_url = '')`
+    ).all();
+  },
   startRun(source) {
     return startRunStmt.run(source).lastInsertRowid;
   },

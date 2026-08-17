@@ -170,11 +170,16 @@ async function aggregateRestaurants(openings) {
           topDishes: new Set(),
           priceBand: null,
           neighborhoods: new Set(),
+          imageUrl: null,
           sources: [],
           firstSeen: null,
         };
         map.set(key, agg);
       }
+      // First non-null image_url across this restaurant's source articles.
+      // Rough proxy for "most editorial" since RSS/OG heroes tend to be
+      // higher quality than random-image fallbacks.
+      if (!agg.imageUrl && o.image_url) agg.imageUrl = o.image_url;
 
       if (!agg.cuisine && r.cuisine) agg.cuisine = r.cuisine;
       if (r.blurb && (!agg.blurb || r.blurb.length > agg.blurb.length)) {
@@ -247,6 +252,7 @@ async function aggregateRestaurants(openings) {
       take: cleanBlurb(a.take, a.name),
       topDishes: [...a.topDishes].slice(0, 8),
       priceBand: a.priceBand,
+      imageUrl: a.imageUrl,
       neighborhoods: [...a.neighborhoods],
       sources: a.sources.sort((x, y) =>
         (y.published_at || "").localeCompare(x.published_at || "")

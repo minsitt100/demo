@@ -236,6 +236,29 @@ export function firstImageFromHtml(html) {
   return m ? m[1] : null;
 }
 
+// Pull the article's Open Graph hero image URL. Nearly every food article
+// publishes one — it's what the site sends to Facebook/Twitter for sharing
+// previews, so it's usually the most representative photo of the piece:
+// the restaurant exterior, a signature dish, the chef, etc.
+//
+// Tries og:image first, falls back to twitter:image, and finally to the
+// first <img> tag in the body if nothing else. Returns null if the article
+// has no image at all.
+export function extractOgImage(html) {
+  if (!html) return null;
+  const patterns = [
+    /<meta[^>]+property=["']og:image(?::url)?["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::url)?["']/i,
+    /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image(?::src)?["']/i,
+  ];
+  for (const p of patterns) {
+    const m = html.match(p);
+    if (m && m[1] && /^https?:\/\//.test(m[1])) return m[1];
+  }
+  return null;
+}
+
 // Verify a URL actually resolves. Used to block dead links from entering the
 // DB at scrape time, and to hide rows whose links died later.
 //

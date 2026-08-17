@@ -227,11 +227,9 @@ const USE_LLM =
 
 const DEBUG = process.env.DEBUG_EXTRACT === "1";
 
-// Fetch an article and pull restaurant names out of it. Returns [] on any
-// failure — extraction is best-effort and should never break a scrape.
-// Set DEBUG_EXTRACT=1 to log the exact failure reason to stderr.
-export async function fetchAndExtract(url, { timeoutMs = 12000, title = "" } = {}) {
-  if (!url) return [];
+// Fetch an article's HTML once. Returns null on any failure.
+async function fetchArticleHtml(url, timeoutMs = 12000) {
+  if (!url) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -247,21 +245,48 @@ export async function fetchAndExtract(url, { timeoutMs = 12000, title = "" } = {
     });
     if (!res.ok) {
       if (DEBUG) console.warn(`[extract] fetch failed ${res.status} ${url}`);
-      return [];
+      return null;
     }
     const html = await res.text();
     if (DEBUG) console.warn(`[extract] fetched ${html.length} chars from ${url}`);
-    if (USE_LLM) {
-      const { extractRestaurantsLLM } = await import("./extract-llm.js");
-      return await extractRestaurantsLLM(html, title);
-    }
-    return extractRestaurants(html);
+    return html;
   } catch (err) {
     if (DEBUG) console.warn(`[extract] error on ${url}: ${err.message}`);
-    return [];
+    return null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Fetch an article and pull restaurant names out of it. Returns [] on any
+// failure — extraction is best-effort and should never break a scrape.
+// Set DEBUG_EXTRACT=1 to log the exact failure reason to stderr.
+export async function fetchAndExtract(url, { timeoutMs = 12000, title = "" } = {}) {
+  const html = await fetchArticleHtml(url, timeoutMs);
+  if (!html) return [];
+  if (USE_LLM) {
+    const { extractRestaurantsLLM } = await import("./extract-llm.js");
+    return await extractRestaurantsLLM(html, title);
+  }
+  return extractRestaurants(html);
+}
+
+// Fetch an article once and pull BOTH the restaurants AND the hero image
+// out of it — used by the enrichment path so we don't fetch each URL twice.
+// Returns { restaurants: [...], image_url: string | null }.
+export async function fetchAndProcess(url, { timeoutMs = 12000, title = "" } = {}) {
+  const html = await fetchArticleHtml(url, timeoutMs);
+  if (!html) return { restaurants: [], image_url: null };
+  const { extractOgImage } = await import("./util.js");
+  const image_url = extractOgImage(html);
+  let restaurants;
+  if (USE_LLM) {
+    const { extractRestaurantsLLM } = await import("./extract-llm.js");
+    restaurants = await extractRestaurantsLLM(html, title);
+  } else {
+    restaurants = extractRestaurants(html);
+  }
+  return { restaurants, image_url };
 }
 
 // Re-extract restaurants for URLs that are stale — i.e., their content lives
@@ -307,15 +332,22 @@ export async function enrichWithRestaurants(items, { concurrency, skipExisting =
   async function worker() {
     while (queue.length) {
       const it = queue.shift();
-      const names = await fetchAndExtract(it.url, { title: it.title });
-      results.set(it.url, names);
+      const processed = await fetchAndProcess(it.url, { title: it.title });
+      results.set(it.url, processed);
     }
   }
   await Promise.all(Array.from({ length: workers }, worker));
-  // Only items we actually enriched get restaurants_mentioned set; the rest
-  // pass through unchanged so INSERT OR IGNORE keeps their stored value.
+  // Only items we actually enriched get restaurants_mentioned + image_url
+  // set; the rest pass through unchanged so INSERT OR IGNORE keeps their
+  // stored values. Respect existing image_url when the fetch didn't yield
+  // one — some RSS feeds already populate it from media:thumbnail.
   return items.map((it) => {
     if (!results.has(it.url)) return it;
-    return { ...it, restaurants_mentioned: JSON.stringify(results.get(it.url) || []) };
+    const r = results.get(it.url);
+    return {
+      ...it,
+      restaurants_mentioned: JSON.stringify(r.restaurants || []),
+      image_url: r.image_url || it.image_url || null,
+    };
   });
 }
