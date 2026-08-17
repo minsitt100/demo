@@ -53,6 +53,33 @@ app.get("/api/restaurants", (req, res) => {
   });
 });
 
+// Defensive cleanup for blurbs that came back from the extractor with
+// Infatuation's inline metadata still glued to the front. The LLM sometimes
+// includes "Save spot <address> $ $ $ $ <cuisine> <neighborhood>" ahead of
+// the actual sentence; users see that as a garbled blurb even when cuisine
+// and neighborhood are populated correctly elsewhere on the card.
+function cleanBlurb(blurb, name) {
+  if (!blurb) return blurb;
+  let t = String(blurb).trim();
+
+  // Best-shot: if the restaurant's name appears in the blurb, slice from
+  // there so the description starts with the name itself.
+  if (name) {
+    const idx = t.toLowerCase().indexOf(name.toLowerCase());
+    if (idx > 0 && idx < 250) t = t.slice(idx).trim();
+  }
+
+  // Fallback strips for whatever prefix remains. Each is idempotent:
+  //   "Save spot " UI label from Infatuation
+  //   Address + zip (with or without "Chicago, IL")
+  //   Price glyphs like "$ $ $ $" or "$$$$"
+  t = t.replace(/^\s*Save\s+spot\s+/i, "");
+  t = t.replace(/^\s*\d+\s+[NSEW]?\.?\s*\w[\w\s.\-]*?,?\s*(?:Chicago,?\s*IL)?\s*\d{5}\s*/i, "");
+  t = t.replace(/^\s*(?:\$\s*){1,5}\s*/i, "");
+
+  return t.trim();
+}
+
 function normalizeName(n) {
   if (!n) return "";
   return n
@@ -190,8 +217,8 @@ function aggregateRestaurants(openings) {
     .map((a) => ({
       name: a.name,
       cuisine: a.cuisine,
-      blurb: a.blurb,
-      take: a.take,
+      blurb: cleanBlurb(a.blurb, a.name),
+      take: cleanBlurb(a.take, a.name),
       topDishes: [...a.topDishes].slice(0, 8),
       priceBand: a.priceBand,
       neighborhoods: [...a.neighborhoods],
