@@ -89,7 +89,12 @@ function currentFiltered() {
   const now = Date.now();
   const cutoffMs = now - timePeriod * 86400 * 1000;
   return state.restaurants.filter((r) => {
-    if (cuisine.size && !cuisine.has(r.cuisine)) return false;
+    // Restaurants can have multiple cuisines (e.g. "Bakery/Cafe" splits
+    // into ["Bakery", "Cafe"]) — matching a filter is any-of, not all-of.
+    if (cuisine.size) {
+      const list = r.cuisines?.length ? r.cuisines : (r.cuisine ? [r.cuisine] : []);
+      if (!list.some((c) => cuisine.has(c))) return false;
+    }
     if (price.size && !price.has(r.priceBand)) return false;
     if (neighborhood.size && !(r.neighborhoods || []).some((n) => neighborhood.has(n))) return false;
     if (r.firstSeen) {
@@ -464,14 +469,21 @@ async function loadRestaurants() {
     const res = await api("/api/restaurants");
     state.restaurants = res.restaurants || [];
     state.maxAgeDays = res.maxAgeDays || state.maxAgeDays;
-    // Collect unique option lists for the filter dropdowns.
-    const cuisineSet = new Set();
+    // Collect unique option lists for the filter dropdowns. Dedupe cuisines
+    // case- and accent-insensitively so "Cafe" and "Café" don't both appear.
+    const cuisineMap = new Map(); // dedupKey -> first-seen display form
+    const cuisineKey = (c) => String(c || "")
+      .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
     const nbhdSet = new Set();
     for (const r of state.restaurants) {
-      if (r.cuisine) cuisineSet.add(r.cuisine);
+      const list = r.cuisines?.length ? r.cuisines : (r.cuisine ? [r.cuisine] : []);
+      for (const c of list) {
+        const k = cuisineKey(c);
+        if (k && !cuisineMap.has(k)) cuisineMap.set(k, c);
+      }
       for (const n of r.neighborhoods || []) if (n) nbhdSet.add(n);
     }
-    state.options.cuisines = [...cuisineSet].sort();
+    state.options.cuisines = [...cuisineMap.values()].sort();
     state.options.neighborhoods = [...nbhdSet].sort();
     refreshUI();
   } catch (e) {

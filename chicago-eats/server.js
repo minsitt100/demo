@@ -80,6 +80,55 @@ function cleanBlurb(blurb, name) {
   return t.trim();
 }
 
+// Split a raw cuisine string into individual normalized cuisines. Handles
+// combined forms ("Bakery/Cafe", "Italian & Pizza", "Mexican and American")
+// by splitting on common separators, then singularizes obvious plurals so
+// "Cafes" / "Cafe" / "Bakery/Cafe" all end up as ["Cafe"] or ["Bakery", "Cafe"]
+// instead of three separate filter entries.
+const CUISINE_PLURALS = {
+  Cafes: "Cafe",
+  Cafés: "Café",
+  Bakeries: "Bakery",
+  Breweries: "Brewery",
+  Wineries: "Winery",
+  Delis: "Deli",
+  Pubs: "Pub",
+  Bars: "Bar",
+  Gastropubs: "Gastropub",
+  Steakhouses: "Steakhouse",
+  Restaurants: "Restaurant",
+  Diners: "Diner",
+};
+
+function titleCaseWord(w) {
+  if (!w) return w;
+  return w[0].toUpperCase() + w.slice(1).toLowerCase();
+}
+
+function normalizeCuisines(raw) {
+  if (!raw || typeof raw !== "string") return [];
+  return raw
+    .split(/\s*[\/&,]\s*|\s+and\s+/i)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((part) => {
+      // Preserve embedded hyphens/apostrophes; title-case each word chunk
+      const cased = part.replace(/[A-Za-z]+/g, titleCaseWord);
+      return CUISINE_PLURALS[cased] || cased;
+    })
+    .filter(Boolean);
+}
+
+// Case- and accent-insensitive key so "Cafe" / "cafe" / "Café" dedupe
+// but the first-seen display form is preserved.
+function cuisineDedupKey(c) {
+  return String(c || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // strip combining diacritics
+    .toLowerCase()
+    .trim();
+}
+
 function normalizeName(n) {
   if (!n) return "";
   return n
@@ -165,6 +214,7 @@ async function aggregateRestaurants(openings) {
           key,
           name: r.name,
           cuisine: null,
+          cuisines: new Map(), // dedupKey -> display form, preserves discovery order
           blurb: null,
           take: null,
           topDishes: new Set(),
@@ -180,7 +230,17 @@ async function aggregateRestaurants(openings) {
       // Rough proxy for "most editorial" since RSS/OG heroes tend to be
       // higher quality than random-image fallbacks.
       if (!agg.imageUrl && o.image_url) agg.imageUrl = o.image_url;
+      // Split combined cuisines ("Bakery/Cafe") and normalize plurals
+      // ("Cafes" → "Cafe"). Each restaurant ends up with a list of
+      // individual, canonical cuisines so filters don't fragment.
+      for (const c of normalizeCuisines(r.cuisine)) {
+        const dk = cuisineDedupKey(c);
+        if (dk && !agg.cuisines.has(dk)) agg.cuisines.set(dk, c);
+      }
 
+      // The .cuisine string field stays as first-seen (used as the card's
+      // "primary" chip); .cuisines array is the split/normalized list used
+      // for filtering.
       if (!agg.cuisine && r.cuisine) agg.cuisine = r.cuisine;
       if (r.blurb && (!agg.blurb || r.blurb.length > agg.blurb.length)) {
         agg.blurb = r.blurb;
@@ -245,9 +305,14 @@ async function aggregateRestaurants(openings) {
   }
 
   return candidates
-    .map((a) => ({
+    .map((a) => {
+      const cuisines = [...a.cuisines.values()];
+      return {
       name: a.name,
-      cuisine: a.cuisine,
+      // Primary cuisine for the card chip is the first normalized cuisine
+      // when we have one; falls back to the raw field otherwise.
+      cuisine: cuisines[0] || a.cuisine || null,
+      cuisines,
       blurb: cleanBlurb(a.blurb, a.name),
       take: cleanBlurb(a.take, a.name),
       topDishes: [...a.topDishes].slice(0, 8),
@@ -259,7 +324,8 @@ async function aggregateRestaurants(openings) {
       ),
       mentions: a.sources.length,
       firstSeen: a.firstSeen,
-    }))
+      };
+    })
     .sort((a, b) =>
       b.mentions - a.mentions ||
       (b.firstSeen || "").localeCompare(a.firstSeen || "")
