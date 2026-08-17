@@ -201,11 +201,18 @@ a { color: inherit; text-decoration: none; }
   text-align: center;
 }
 .pill-chev {
-  font-size: 10px;
-  color: var(--ink-faint);
-  transition: transform 200ms var(--ease);
+  width: 18px;
+  height: 18px;
+  color: var(--ink-soft);
+  flex-shrink: 0;
+  transition: transform 220ms var(--ease), color 160ms var(--ease);
+  transform-origin: center;
 }
-.filter-pill.is-open .pill-chev { transform: rotate(180deg); }
+.filter-pill:hover .pill-chev { color: var(--accent); }
+.filter-pill.is-open .pill-chev {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
 
 /* Dropdown overlay */
 .filter-dropdown {
