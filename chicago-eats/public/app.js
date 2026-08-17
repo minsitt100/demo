@@ -225,7 +225,7 @@ function renderCuisineFilters() {
   });
 }
 
-function renderSourceStatus(runs, sourceStats, extractor) {
+function renderSourceStatus(runs, sourceStats, extractor, validator) {
   const wrap = $("#footer-status");
   const list = $("#source-status");
   if (!runs || !runs.length) { wrap.hidden = true; return; }
@@ -237,12 +237,15 @@ function renderSourceStatus(runs, sourceStats, extractor) {
   }
   const statsBySource = new Map((sourceStats || []).map((s) => [s.source, s]));
 
-  // Header row: which extractor is currently running
+  // Header rows: which extractor / validator is currently running
   const extractorLine = extractor
     ? `<li class="extractor-line"><span>Extractor</span><span class="${extractor.mode === "llm" ? "ok" : ""}">${escapeHtml(extractor.mode)}${extractor.model ? ` · ${escapeHtml(extractor.model)}` : ""}</span></li>`
     : "";
 
-  list.innerHTML = extractorLine + [...latestBySource.values()].map((r) => {
+  const validatorLine = validator
+    ? `<li class="extractor-line"><span>Validator</span><span class="${validator.mode === "llm" ? "ok" : ""}">${escapeHtml(validator.mode)}${validator.model ? ` · ${escapeHtml(validator.model)}` : ""}</span></li>`
+    : "";
+  list.innerHTML = extractorLine + validatorLine + [...latestBySource.values()].map((r) => {
     const cls = r.error ? "err" : "ok";
     const detail = r.error
       ? `error: ${escapeHtml(r.error.slice(0, 40))}`
@@ -265,7 +268,7 @@ async function loadStatus() {
   try {
     const s = await api("/api/status");
     state.maxAgeDays = s.maxAgeDays || null;
-    renderSourceStatus(s.recentRuns, s.sourceStats, s.extractor);
+    renderSourceStatus(s.recentRuns, s.sourceStats, s.extractor, s.validator);
     if (s.recentRuns?.[0]?.finished_at) {
       $("#last-updated").textContent = "Updated " + relativeTime(s.recentRuns[0].finished_at);
     }

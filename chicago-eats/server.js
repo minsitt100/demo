@@ -42,10 +42,10 @@ app.get("/api/sources", (_req, res) => {
 // unique restaurants (deduped by normalized name), each carrying the list
 // of source articles that mentioned it, best cuisine + blurb guess, and
 // the earliest coverage date.
-app.get("/api/restaurants", (req, res) => {
+app.get("/api/restaurants", async (req, res) => {
   const cutoff = cutoffIso();
   const rows = dbApi.listAllInWindow({ cutoff });
-  const restaurants = aggregateRestaurants(rows);
+  const restaurants = await aggregateRestaurants(rows);
   res.json({
     total: restaurants.length,
     maxAgeDays: MAX_AGE_DAYS,
@@ -129,7 +129,10 @@ function looksLikeArticleTitle(name) {
 // disable a source with a one-line change without wiping historical data.
 const activeSourceIds = new Set(sources.map((s) => s.meta.id));
 
-function aggregateRestaurants(openings) {
+const USE_LLM_VALIDATOR =
+  process.env.VALIDATOR === "llm" && !!process.env.ANTHROPIC_API_KEY;
+
+async function aggregateRestaurants(openings) {
   const map = new Map(); // normalized name -> aggregate
 
   for (const o of openings) {
@@ -209,11 +212,29 @@ function aggregateRestaurants(openings) {
     }
   }
 
-  return [...map.values()]
+  let candidates = [...map.values()]
     // Only show restaurants that have at least one "opening" (currently open)
     // source article. Rows whose sources are all `upcoming` are future
     // openings — per the site's rule, we don't surface those.
-    .filter((a) => a.sources.some((s) => s.status === "opening"))
+    .filter((a) => a.sources.some((s) => s.status === "opening"));
+
+  // LLM-driven validation when opted in. Runs concurrently with a bounded
+  // worker pool; results cached across requests so this only pays real
+  // API cost on the first aggregation after a scrape brought in new names.
+  if (USE_LLM_VALIDATOR && candidates.length) {
+    const { validateBatch } = await import("./sources/validate-llm.js");
+    const names = candidates.map((c) => c.name);
+    const contexts = Object.fromEntries(
+      candidates.map((c) => [c.name, { articleTitle: c.sources[0]?.title }])
+    );
+    const results = await validateBatch(names, contexts);
+    candidates = candidates.filter((c) => {
+      const v = results.get(c.name);
+      return v ? v.valid : true; // if lookup missed for any reason, keep
+    });
+  }
+
+  return candidates
     .map((a) => ({
       name: a.name,
       cuisine: a.cuisine,
@@ -240,10 +261,14 @@ app.get("/api/status", (_req, res) => {
     process.env.EXTRACTOR === "llm" && process.env.ANTHROPIC_API_KEY
       ? { mode: "llm", model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5" }
       : { mode: "regex", model: null };
+  const validator = USE_LLM_VALIDATOR
+    ? { mode: "llm", model: process.env.VALIDATOR_MODEL || "claude-haiku-4-5" }
+    : { mode: "regex", model: null };
   res.json({
     total: dbApi.count({ cutoff }),
     maxAgeDays: MAX_AGE_DAYS,
     extractor,
+    validator,
     recentRuns: dbApi.recentRuns(),
     sourceStats: dbApi.sourceStats(),
     sources: sources.map((s) => ({ id: s.meta.id, label: s.meta.label })),
