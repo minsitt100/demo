@@ -153,6 +153,17 @@ const activeSourceIds = new Set(sources.map((s) => s.meta.id));
 const USE_LLM_VALIDATOR =
   process.env.VALIDATOR === "llm" && !!process.env.ANTHROPIC_API_KEY;
 
+// Two independent flags so users don't have to remember the full env
+// var soup on every `npm start`:
+//   USE_PHOTO_CACHE   — always ON when a Google key is set. Reads any
+//                       cached Places photos and swaps them in. Free
+//                       (pure DB read).
+//   USE_PHOTO_FETCHER — ON when PHOTO_FETCHER=google_places is set too.
+//                       Controls whether cache MISSES trigger a background
+//                       Places API call (costs money).
+// Effect: once you've run `backfill:photos` once, `npm start` alone is
+// enough for the UI to show the fetched photos on subsequent boots.
+const USE_PHOTO_CACHE = !!process.env.GOOGLE_PLACES_API_KEY;
 const USE_PHOTO_FETCHER =
   process.env.PHOTO_FETCHER === "google_places" && !!process.env.GOOGLE_PLACES_API_KEY;
 
@@ -290,8 +301,9 @@ async function aggregateRestaurants(openings) {
   // roundup collision (one article's hero photo attached to every
   // restaurant it mentioned). Route those to Google Places for a real
   // per-restaurant photo. Cache-hit swaps the URL now; cache-miss keeps
-  // the OG image on this render and warms the cache for the next reload.
-  if (USE_PHOTO_FETCHER && candidates.length) {
+  // the OG image on this render and (when USE_PHOTO_FETCHER is on) warms
+  // the cache for the next reload.
+  if (USE_PHOTO_CACHE && candidates.length) {
     const { findPhotoFromCache, queueForPhotoFetch } = await import("./sources/photo-fetcher.js");
     const imgCounts = new Map();
     for (const c of candidates) {
@@ -320,12 +332,12 @@ async function aggregateRestaurants(openings) {
       else if (cached && (cached.status === "no_food" || cached.status === "not_found" || cached.status === "error")) {
         // no-op — the OG image stays
       }
-      // Not yet tried — queue for background fetch.
+      // Not yet tried — queue for background fetch (only if fetching enabled).
       else if (!cached) {
         toFetch.push({ name: c.name, neighborhood });
       }
     }
-    queueForPhotoFetch(toFetch);
+    if (USE_PHOTO_FETCHER) queueForPhotoFetch(toFetch);
   }
 
   return candidates

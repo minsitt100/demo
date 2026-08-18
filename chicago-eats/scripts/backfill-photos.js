@@ -22,6 +22,17 @@ const ALL = process.env.ALL === "1";
 const THRESHOLD = parseInt(process.env.THRESHOLD, 10) || 3;
 const LIMIT = parseInt(process.env.LIMIT, 10) || Infinity;
 const RERANK = process.env.RERANK === "1";
+const PURGE = process.env.PURGE === "1";
+
+// PURGE=1 nukes the entire place_photos cache before running. Use when
+// the cache is polluted with old picker_error / null-photo rows and you
+// want a full clean rebuild. Only touches the photo cache — restaurant
+// data is untouched. Costs one full round of Places API calls.
+if (PURGE) {
+  const info = db.prepare(`DELETE FROM place_photos`).run();
+  console.log(`PURGE=1: nuked ${info.changes} photo cache entries — starting fresh`);
+  console.log("");
+}
 
 // RERANK=1 clears cache rows whose picked kind is NOT food/drink/food_scene
 // (or is a pre-picker "top"/"only"/"unlabeled" row from an older run) so

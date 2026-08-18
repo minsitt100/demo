@@ -7,6 +7,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start:full": "EXTRACTOR=llm VALIDATOR=llm PHOTO_FETCHER=google_places node server.js",
     "scrape": "node -e \"import('./scraper.js').then(m => m.runAllSources().then(n => { console.log('done:', n, 'new'); process.exit(0); }))\"",
     "seed:demo": "node scripts/seed-demo.js",
     "verify:urls": "node scripts/verify-urls.js",
