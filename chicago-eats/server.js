@@ -13,6 +13,10 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 const SCRAPE_CRON = process.env.SCRAPE_CRON || "*/30 * * * *"; // every 30 min
 const SCRAPE_ON_BOOT = process.env.SCRAPE_ON_BOOT !== "0";
+// NO_CRON=1 disables the scheduled scraper entirely. Use when doing UI
+// work — combined with SCRAPE_ON_BOOT=0 and no LLM env vars, the server
+// runs off the existing DB cache with zero outbound API calls.
+const NO_CRON = process.env.NO_CRON === "1";
 // How far back the feed reaches. Change with e.g. MAX_AGE_DAYS=180 npm start.
 const MAX_AGE_DAYS = parseInt(process.env.MAX_AGE_DAYS, 10) || 90;
 
@@ -437,11 +441,17 @@ app.post("/api/restaurants/hide", express.json(), (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`chicago-eats listening on http://localhost:${PORT}`);
-  console.log(`scrape schedule: "${SCRAPE_CRON}"`);
+  if (NO_CRON) {
+    console.log("scrape schedule: DISABLED (NO_CRON=1)");
+  } else {
+    console.log(`scrape schedule: "${SCRAPE_CRON}"`);
+  }
   if (SCRAPE_ON_BOOT) {
     runAllSources().catch((e) => console.warn("boot scrape failed:", e.message));
   }
-  cron.schedule(SCRAPE_CRON, () => {
-    runAllSources().catch((e) => console.warn("cron scrape failed:", e.message));
-  });
+  if (!NO_CRON) {
+    cron.schedule(SCRAPE_CRON, () => {
+      runAllSources().catch((e) => console.warn("cron scrape failed:", e.message));
+    });
+  }
 });
