@@ -59,15 +59,14 @@ REJECT — return index = -1, kind = "none":
 
 Be strict. Even a mediocre food photo beats the most beautiful interior. Only return -1 if you are certain that NONE of the candidate photos show food, drink, or food preparation. Look at every single candidate before deciding.`;
 
-// Pick the best food photo from a list of candidate URLs. Returns
-// { index, kind }:
-//   index >= 0        → a food/drink/food_scene photo at that position
-//   index === -1      → no food photo in the candidates; caller should
-//                       fall back to the OG image (kind === "none")
-// On any picker error, returns { index: -1, kind: "picker_error" } so
-// we DON'T lock in a random interior — the caller keeps the OG image.
+// Pick the best photo from a list of candidate URLs. Prefers food, but
+// ALWAYS returns a real index — never -1. This keeps every card looking
+// good: food when available, interior/exterior otherwise (still unique
+// per restaurant, still better than a shared OG hero shot).
+// Returns { index, kind }. On picker error, falls back to index 0 (the
+// top-ranked Google photo).
 export async function pickBestPhoto(uris) {
-  if (!uris?.length) return { index: -1, kind: "none" };
+  if (!uris?.length) return { index: 0, kind: "none" };
 
   const content = [{ type: "text", text: "Here are the candidate photos, numbered from 0:" }];
   for (let i = 0; i < uris.length; i++) {
@@ -90,18 +89,19 @@ export async function pickBestPhoto(uris) {
       messages: [{ role: "user", content }],
     });
     const block = response.content.find((b) => b.type === "text");
-    if (!block) return { index: -1, kind: "no-response" };
+    if (!block) return { index: 0, kind: "no-response" };
     const parsed = JSON.parse(block.text);
-    // Strict acceptance: only food/drink/food_scene count as picks.
-    // Anything else (interior/exterior/menu/other) is treated as "no food."
-    const FOOD_KINDS = new Set(["food", "drink", "food_scene"]);
-    if (parsed.index >= 0 && parsed.index < uris.length && FOOD_KINDS.has(parsed.kind)) {
+    // If the model picked a valid in-range index, honor it (food, drink,
+    // food_scene, OR interior/exterior — we take whatever is best).
+    if (parsed.index >= 0 && parsed.index < uris.length) {
       return parsed;
     }
-    return { index: -1, kind: parsed.kind || "none" };
+    // Model returned -1 (no food found) — fall back to top-ranked photo
+    // so the card still gets a real per-place image instead of nothing.
+    return { index: 0, kind: parsed.kind || "top" };
   } catch (err) {
     console.warn(`[photo-picker] ${uris.length} candidates failed: ${err.message}`);
-    return { index: -1, kind: "picker_error" };
+    return { index: 0, kind: "picker_error" };
   }
 }
 

@@ -313,27 +313,19 @@ async function aggregateRestaurants(openings) {
     for (const c of candidates) {
       const shared = c.imageUrl && (imgCounts.get(c.imageUrl) || 0) >= SHARED_IMAGE_THRESHOLD;
       const missing = !c.imageUrl;
-      if (!shared && !missing) continue;
       const neighborhood = [...c.neighborhoods][0] || null;
       const cached = findPhotoFromCache(c.name, neighborhood);
-      // A food/drink/food_scene pick — always use it.
-      if (cached?.status === "ok" && cached.photo_url) {
+      // Any cached photo_url beats any OG. The picker prefers food but
+      // will return an interior/exterior when Google has no food photos,
+      // so this is always at least a real photo of THIS place — never
+      // the shared roundup hero.
+      if (cached?.photo_url) {
         c.imageUrl = cached.photo_url;
+        continue;
       }
-      // No food found, but we saved Google's top photo of the place as a
-      // fallback. Use it whenever the OG is shared across a roundup —
-      // a unique interior/exterior beats yet another tostada photo.
-      else if (cached?.status === "no_food" && cached.photo_url && shared) {
-        c.imageUrl = cached.photo_url;
-      }
-      // Already tried, nothing available at all (place not on Places
-      // or Places had no photos, or the OG is unique so we shouldn't
-      // stomp on it). Keep the OG.
-      else if (cached && (cached.status === "no_food" || cached.status === "not_found" || cached.status === "error")) {
-        // no-op — the OG image stays
-      }
-      // Not yet tried — queue for background fetch (only if fetching enabled).
-      else if (!cached) {
+      // Only queue a fetch for cards that need it (shared or missing).
+      // Non-shared, non-missing cards keep their editorial OG hero.
+      if ((shared || missing) && !cached) {
         toFetch.push({ name: c.name, neighborhood });
       }
     }

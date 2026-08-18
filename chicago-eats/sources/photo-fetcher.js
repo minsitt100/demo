@@ -165,21 +165,12 @@ export async function fetchPhotoNow(name, neighborhood) {
         )).filter(Boolean);
         if (uris.length) {
           if (isPhotoPickerEnabled()) {
+            // The picker always returns a real index (food-preferred,
+            // interior/exterior otherwise). We take whatever it gives.
             const pick = await pickBestPhoto(uris);
-            if (pick.index >= 0) {
-              record.photo_url = uris[pick.index];
-              record.status = "ok";
-              record.kind = pick.kind;
-            } else {
-              // No food photo among the candidates. Still store Google's
-              // top-ranked photo of THIS place as a fallback — the
-              // aggregator will use it when the article's OG image is
-              // shared across multiple restaurants (i.e. a roundup),
-              // so at least each card gets its own unique image.
-              record.photo_url = uris[0];
-              record.status = "no_food";
-              record.kind = pick.kind || "none";
-            }
+            record.photo_url = uris[pick.index] || uris[0];
+            record.status = "ok";
+            record.kind = pick.kind;
           } else {
             // Picker disabled — use Google's top-ranked photo as-is.
             record.photo_url = uris[0];
