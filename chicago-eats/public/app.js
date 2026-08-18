@@ -183,10 +183,21 @@ function renderCard(r) {
       <span class="mention-count">${r.mentions} article${r.mentions === 1 ? "" : "s"}</span>
       <span class="rcard-foot-actions">
         <button class="rcard-hide" data-hide-name="${escapeHtml(r.name)}" title="Not a real restaurant / hide from feed">✕</button>
+        <button class="rcard-toggle" type="button">
+          Show articles
+          <span class="chev" aria-hidden="true">▾</span>
+        </button>
       </span>
     </footer>
   `;
 
+  // Clicking the "Show articles" pill selects the restaurant, same as
+  // clicking anywhere on the card — the pill is a visual hint that the
+  // card has more to reveal.
+  el.querySelector(".rcard-toggle")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    selectRestaurant(r);
+  });
   el.querySelector(".rcard-hide")?.addEventListener("click", async (e) => {
     e.stopPropagation();
     const name = e.currentTarget.dataset.hideName;

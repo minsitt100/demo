@@ -49,9 +49,7 @@ a { color: inherit; text-decoration: none; }
   border-bottom: 1px solid var(--line);
 }
 .header-inner {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 16px 24px;
+  padding: 16px 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -132,19 +130,10 @@ a { color: inherit; text-decoration: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* -------- container -------- */
+/* Edge-to-edge, always. Matches the header alignment and the design's
+   full-width feel (per Aug 18 UX pass). */
 .container {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 28px 24px 80px;
-  transition: max-width 260ms var(--ease), padding 260ms var(--ease);
-}
-/* When a restaurant is selected, the page shifts left-aligned and grows
-   wider so the detail pane has room without squeezing the card grid. */
-.container.has-detail {
-  max-width: 1720px;
-  margin: 0;
-  padding-left: 40px;
-  padding-right: 40px;
+  padding: 28px 40px 80px;
 }
 
 /* -------- master/detail layout -------- */
@@ -153,16 +142,11 @@ a { color: inherit; text-decoration: none; }
 }
 .layout.has-detail {
   display: grid;
-  /* Left grows to fill; right pane is a fixed-ish width. */
-  grid-template-columns: minmax(0, 1fr) minmax(400px, 480px);
-  gap: 28px;
+  /* Grid on the left keeps its 3-col shape; detail pane on the right
+     is a wide, fixed-ish column with room for future features. */
+  grid-template-columns: minmax(0, 1fr) minmax(460px, 560px);
+  gap: 32px;
   align-items: flex-start;
-}
-/* Grid downshifts from 3 cols → 2 cols when the detail pane opens,
-   so cards stay legible instead of shrinking. */
-.layout.has-detail .rgrid { grid-template-columns: repeat(2, 1fr); }
-@media (max-width: 1400px) {
-  .layout.has-detail .rgrid { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* Right pane: sticky so it stays put as you scroll the grid; scrolls
