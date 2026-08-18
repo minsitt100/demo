@@ -30,8 +30,10 @@ const OUTPUT_SCHEMA = {
   properties: {
     // -1 signals "no food / drink / food-prep photo in the candidates"
     // so the caller can fall back to the OG image instead of showing
-    // yet another interior shot.
-    index: { type: "integer", minimum: -1 },
+    // yet another interior shot. Range is enforced in code — the
+    // Anthropic JSON schema validator doesn't accept `minimum` on
+    // integer types.
+    index: { type: "integer" },
     kind: {
       type: "string",
       enum: ["food", "drink", "food_scene", "interior", "exterior", "menu", "other", "none"],
