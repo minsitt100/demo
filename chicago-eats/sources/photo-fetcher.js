@@ -171,9 +171,12 @@ export async function fetchPhotoNow(name, neighborhood) {
               record.status = "ok";
               record.kind = pick.kind;
             } else {
-              // No food photo among the candidates. Mark it so the
-              // aggregator falls back to the article's OG image rather
-              // than showing yet another interior shot.
+              // No food photo among the candidates. Still store Google's
+              // top-ranked photo of THIS place as a fallback — the
+              // aggregator will use it when the article's OG image is
+              // shared across multiple restaurants (i.e. a roundup),
+              // so at least each card gets its own unique image.
+              record.photo_url = uris[0];
               record.status = "no_food";
               record.kind = pick.kind || "none";
             }

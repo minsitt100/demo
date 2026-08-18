@@ -332,12 +332,24 @@ async function aggregateRestaurants(openings) {
       if (!shared && !missing) continue;
       const neighborhood = [...c.neighborhoods][0] || null;
       const cached = findPhotoFromCache(c.name, neighborhood);
+      // A food/drink/food_scene pick — always use it.
       if (cached?.status === "ok" && cached.photo_url) {
         c.imageUrl = cached.photo_url;
-      } else if (cached && (cached.status === "no_food" || cached.status === "not_found" || cached.status === "error")) {
-        // Already tried Google Places — nothing food-forward available.
-        // Keep the article's OG image (even if shared) as the fallback.
-      } else if (!cached) {
+      }
+      // No food found, but we saved Google's top photo of the place as a
+      // fallback. Use it whenever the OG is shared across a roundup —
+      // a unique interior/exterior beats yet another tostada photo.
+      else if (cached?.status === "no_food" && cached.photo_url && shared) {
+        c.imageUrl = cached.photo_url;
+      }
+      // Already tried, nothing available at all (place not on Places
+      // or Places had no photos, or the OG is unique so we shouldn't
+      // stomp on it). Keep the OG.
+      else if (cached && (cached.status === "no_food" || cached.status === "not_found" || cached.status === "error")) {
+        // no-op — the OG image stays
+      }
+      // Not yet tried — queue for background fetch.
+      else if (!cached) {
         toFetch.push({ name: c.name, neighborhood });
       }
     }
