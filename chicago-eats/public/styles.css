@@ -150,10 +150,12 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* Right pane: sticky so it stays put as you scroll the grid; scrolls
-   internally when its content is taller than the viewport. */
+   internally when its content is taller than the viewport. Its top
+   offset is the combined height of the sticky header + filters bar,
+   kept in sync from JS via the --sticky-body-top CSS variable. */
 .layout-right {
   position: sticky;
-  top: 28px;
+  top: var(--sticky-body-top, 240px);
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -297,8 +299,20 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* -------- filters (new pill + dropdown UI) -------- */
+/* Sticky just below the sticky site header, so users can change
+   filters at any scroll position. Negative side margins + matching
+   padding make the section bleed to the container's edges (so its
+   translucent background looks like a full-width toolbar rather than
+   a floating card). */
 .filters-section {
-  margin-bottom: 24px;
+  position: sticky;
+  top: var(--sticky-header-h, 68px);  /* just below the site header */
+  z-index: 20;               /* below header (30), above grid */
+  margin: -28px -40px 24px;  /* pulls up + spans past container padding */
+  padding: 20px 40px 16px;
+  background: rgba(250, 247, 242, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
 }
 .filters-heading {
   font-family: "Inter", sans-serif;

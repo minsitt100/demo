@@ -504,7 +504,25 @@ function refreshUI() {
   renderCounts();
   // If a dropdown is open, re-render it to reflect the new selection state
   if (state.openDropdown) renderDropdown(state.openDropdown);
+  // Filter bar height changes when active-filters shows/hides — keep
+  // the detail pane's sticky top offset aligned so it never underlaps
+  // the filter bar.
+  updateStickyOffsets();
 }
+
+// Measures the sticky header + filters bar and writes their heights to
+// CSS variables so the detail pane knows where to stick. Called on load,
+// resize, and any UI change that could alter the filter bar height.
+function updateStickyOffsets() {
+  const header = document.querySelector(".site-header");
+  const filters = document.querySelector(".filters-section");
+  if (!header || !filters) return;
+  const headerH = Math.round(header.getBoundingClientRect().height);
+  const filtersH = Math.round(filters.getBoundingClientRect().height);
+  document.documentElement.style.setProperty("--sticky-header-h", `${headerH}px`);
+  document.documentElement.style.setProperty("--sticky-body-top", `${headerH + filtersH + 8}px`);
+}
+window.addEventListener("resize", updateStickyOffsets);
 
 function renderSourceStatus(runs, sourceStats, extractor, validator) {
   const wrap = $("#footer-status");
