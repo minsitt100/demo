@@ -302,7 +302,7 @@ function renderDropdown(filter) {
     if (!list.length) return `<div class="dropdown-empty">No cuisines yet</div>`;
     optionsHtml = list.map((c) => {
       const selected = state.filters.cuisine.has(c);
-      return `<button type="button" class="dropdown-option ${selected ? "is-selected" : ""}" data-value="${escapeHtml(c)}"><span class="check">✓</span>${(CUISINE_EMOJI[c] || "")} ${escapeHtml(c)}</button>`;
+      return `<button type="button" class="dropdown-option ${selected ? "is-selected" : ""}" data-value="${escapeHtml(c)}"><span class="check">✓</span>${escapeHtml(c)}</button>`;
     }).join("");
   } else if (filter === "price") {
     optionsHtml = state.options.prices.map((p) => {
