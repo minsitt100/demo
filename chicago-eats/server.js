@@ -323,8 +323,16 @@ async function aggregateRestaurants(openings) {
         c.imageUrl = cached.photo_url;
         continue;
       }
-      // Only queue a fetch for cards that need it (shared or missing).
-      // Non-shared, non-missing cards keep their editorial OG hero.
+      // Shared OG + no per-place photo → drop the image entirely. Better
+      // to show no image than the shared roundup hero (the "tostada"
+      // problem). The card still renders — the frontend omits the image
+      // element when imageUrl is null.
+      if (shared) {
+        c.imageUrl = null;
+      }
+      // Non-shared unique OG → keep it as the editorial hero photo.
+      // Only queue a fetch when we haven't tried Google yet AND the card
+      // needs one (shared or missing image).
       if ((shared || missing) && !cached) {
         toFetch.push({ name: c.name, neighborhood });
       }
