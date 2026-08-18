@@ -230,9 +230,27 @@ function renderCard(r) {
 }
 
 function toggleExpanded(id) {
-  if (state.expanded.has(id)) state.expanded.delete(id);
+  const isOpen = state.expanded.has(id);
+  if (isOpen) state.expanded.delete(id);
   else state.expanded.add(id);
-  renderGrid();
+  // Toggle just this one card instead of re-rendering the whole grid —
+  // otherwise every card's image reloads and the page flickers on each
+  // click. Update only the class and the hidden state of its expanded
+  // section, in place.
+  const card = document.querySelector(`.rcard[data-id="${CSS.escape(id)}"]`);
+  if (!card) return;
+  card.classList.toggle("is-expanded", !isOpen);
+  const expanded = card.querySelector(".rcard-expanded");
+  if (expanded) {
+    if (isOpen) expanded.setAttribute("hidden", "");
+    else expanded.removeAttribute("hidden");
+  }
+  const toggle = card.querySelector(".rcard-toggle");
+  if (toggle) {
+    const label = isOpen ? "Show articles" : "Hide articles";
+    const chev = isOpen ? "▾" : "▴";
+    toggle.innerHTML = `${label} <span class="chev" aria-hidden="true">${chev}</span>`;
+  }
 }
 
 function renderCounts() {
