@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { dbApi } from "./db.js";
 import { sources } from "./sources/index.js";
 import { runAllSources } from "./scraper.js";
+import { looksLikeArticleTitle } from "./name-filter.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -140,38 +141,9 @@ function normalizeName(n) {
     .trim();
 }
 
-// Reject values that are obviously article titles or headline fragments
-// rather than real restaurant names. Filters out the ambient noise you get
-// from title-guessing when the LLM extractor couldn't identify a specific
-// place (e.g. "New Fulton Market wine bar debuts…", "10 places to eat…").
-function looksLikeArticleTitle(name) {
-  if (!name) return false;
-  const t = name.trim();
-  if (t.length > 40) return true;                          // real names are short
-  if (/^\d/.test(t)) return true;                          // "10 Best…"
-  if (/\s(opens?|opening|debuts?|coming to|now open)\s/i.test(t)) return true;
-  if (/\bnew\s+(restaurants?|spots?|openings?|places?)/i.test(t)) return true;
-  if (/^(where|how|why|the best|best|these|inside|meet|this|watch)\s/i.test(t)) return true;
-  if (/^(top|our)\s+\d/i.test(t)) return true;             // "Top 25", "Our 12"
-  if (/^(a|an)\s+[a-z]/.test(t)) return true;              // "A luxury steakhouse"
-  if (/\b(chic|luxury|hot new|buzzy|trendy)\b/i.test(t)) return true;   // headline-descriptor giveaways
-  if (/\b(highest-rated|top-rated|must-try|best of|hit list)\b/i.test(t)) return true;
-  if (/\bis\s*$/i.test(t)) return true;                    // "A luxury steakhouse is" (truncated)
-  if (/[:—–]/.test(t)) return true;                         // colon / em-dash → title punctuation
-  if ((t.match(/,/g) || []).length >= 2) return true;      // list-comma structure
-  // ALL-CAPS multi-word strings are almost always section headers
-  // ("THE SPOTS", "OUR PICKS", "THE WINNERS"). Keep short single-word
-  // all-caps like "NAIA" or "STK" — real short brand names.
-  if (t === t.toUpperCase() && /\s/.test(t)) return true;
-  // Common generic section labels regardless of case
-  if (/^the\s+(spots?|picks?|list|best|winners?|highlights?|contenders?|newcomers?)$/i.test(t)) return true;
-  // "First Last, Location" style — usually a person + school/city caption
-  // from a non-food article (e.g. Sun-Times high school sports coverage).
-  // Real restaurants don't append a location to their name in this shape;
-  // if they did, the location would live in the neighborhood field instead.
-  if (/^[A-Z][a-z]+(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+,\s+[A-Z]/.test(t)) return true;
-  return false;
-}
+// looksLikeArticleTitle lives in ./name-filter.js so both the aggregator
+// and the photo backfill script apply the same rejection rules — we don't
+// want to spend Google Places calls on names the UI would filter out.
 
 // IDs of currently-registered sources. Rows in the DB from sources that
 // have since been removed from sources/index.js are ignored — lets us

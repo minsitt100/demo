@@ -16,6 +16,7 @@
 
 import db, { dbApi } from "../db.js";
 import { fetchPhotoNow, photoFetcherStats } from "../sources/photo-fetcher.js";
+import { looksLikeArticleTitle } from "../name-filter.js";
 
 const ALL = process.env.ALL === "1";
 const THRESHOLD = parseInt(process.env.THRESHOLD, 10) || 3;
@@ -68,6 +69,11 @@ function buildRestaurantMap() {
     } catch { /* ignore */ }
     if (!mentioned.length && o.restaurant) mentioned = [{ name: o.restaurant }];
     for (const r of mentioned) {
+      // Ghost filter — skip article-title fragments so we don't waste
+      // Places API calls (and end up caching random restaurants under
+      // ghost names, which is where the "same food photo everywhere"
+      // problem comes from).
+      if (looksLikeArticleTitle(r.name)) continue;
       const key = normalizeName(r.name);
       if (!key) continue;
       let agg = map.get(key);
@@ -82,6 +88,23 @@ function buildRestaurantMap() {
   }
   return [...map.values()];
 }
+
+// One-time cleanup for ghost cache entries left over from previous runs
+// (before the tightened filter). Deletes any place_photos row whose
+// stored name would now be rejected by looksLikeArticleTitle, so a
+// re-run of the backfill starts from a clean slate for those names.
+function purgeGhostCache() {
+  const all = db.prepare(`SELECT key, name FROM place_photos`).all();
+  const ghosts = all.filter((r) => looksLikeArticleTitle(r.name));
+  if (!ghosts.length) return 0;
+  const stmt = db.prepare(`DELETE FROM place_photos WHERE key = ?`);
+  const tx = db.transaction((rows) => rows.forEach((r) => stmt.run(r.key)));
+  tx(ghosts);
+  return ghosts.length;
+}
+
+const purged = purgeGhostCache();
+if (purged) console.log(`ghost cache purge: removed ${purged} entries whose names look like article titles`);
 
 const restaurants = buildRestaurantMap();
 const imgCounts = new Map();
@@ -125,3 +148,25 @@ for (let i = 0; i < targets.length; i++) {
 console.log("");
 console.log(`done: ${ok} food, ${noFood} no-food (kept OG), ${cached} cached, ${notFound} not on Places, ${errored} errors`);
 console.log(`cache size: ${photoFetcherStats().total}`);
+
+// Duplicate-URL check. If two restaurants ended up with the same
+// photo_url, Google's fuzzy search matched them to the same place — a
+// signal that one of the names is too vague and should probably be
+// filtered upstream (or both restaurants are actually the same place
+// under different transcriptions).
+const dupes = db.prepare(`
+  SELECT photo_url, COUNT(*) AS n, GROUP_CONCAT(name, ' || ') AS names
+  FROM place_photos
+  WHERE photo_url IS NOT NULL
+  GROUP BY photo_url
+  HAVING n > 1
+  ORDER BY n DESC
+`).all();
+if (dupes.length) {
+  console.log("");
+  console.log(`⚠️  ${dupes.length} photo URLs are shared across multiple restaurants:`);
+  for (const d of dupes.slice(0, 10)) {
+    console.log(`   ${d.n}× ${d.names}`);
+  }
+  if (dupes.length > 10) console.log(`   ...and ${dupes.length - 10} more`);
+}

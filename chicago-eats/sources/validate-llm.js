@@ -49,7 +49,10 @@ For each name, decide whether it is a plausible real Chicago restaurant, cafe, b
 REJECT (valid: false) if the name is:
 - A section header from an article ("THE SPOTS", "Our Top Picks", "The Best", "REFERENCED IN")
 - An article title or fragment ("Top 25: The Best Restaurants In Chicago", "Inside NAIA's chic", "A luxury steakhouse is")
+- A descriptor phrase, with or without a real name attached ("Michelin-starred Chicago restaurant group", "Chicago hot dog staple Jim's Original", "Chicago-style hot dog spot to hold grand", "Beloved neighborhood spot")
+- A truncated headline ("Chicago hot dog spot to hold grand", "…to open next month", "…coming to Wicker Park")
 - A generic phrase or placeholder ("New Restaurant", "Midwestern restaurant", "A new pizzeria")
+- An industry-noun suffix without a specific brand ("Restaurant Group", "Hospitality Group", "Concept")
 - A person's name with a school or team ("Tavares Harrington, Mount Carmel", "David Hill, Homewood-Flossmoor")
 - A neighborhood or city ("Wicker Park", "Chicago", "River North")
 - A publication or media brand ("Eater", "The Infatuation", "Block Club")
