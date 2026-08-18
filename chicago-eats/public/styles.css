@@ -136,6 +136,180 @@ a { color: inherit; text-decoration: none; }
   max-width: 1180px;
   margin: 0 auto;
   padding: 28px 24px 80px;
+  transition: max-width 260ms var(--ease), padding 260ms var(--ease);
+}
+/* When a restaurant is selected, the page shifts left-aligned and grows
+   wider so the detail pane has room without squeezing the card grid. */
+.container.has-detail {
+  max-width: 1720px;
+  margin: 0;
+  padding-left: 40px;
+  padding-right: 40px;
+}
+
+/* -------- master/detail layout -------- */
+.layout {
+  display: block; /* single column when no detail is open */
+}
+.layout.has-detail {
+  display: grid;
+  /* Left grows to fill; right pane is a fixed-ish width. */
+  grid-template-columns: minmax(0, 1fr) minmax(400px, 480px);
+  gap: 28px;
+  align-items: flex-start;
+}
+/* Grid downshifts from 3 cols → 2 cols when the detail pane opens,
+   so cards stay legible instead of shrinking. */
+.layout.has-detail .rgrid { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 1400px) {
+  .layout.has-detail .rgrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Right pane: sticky so it stays put as you scroll the grid; scrolls
+   internally when its content is taller than the viewport. */
+.layout-right {
+  position: sticky;
+  top: 28px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow-y: auto;
+  max-height: calc(100vh - 56px);
+  animation: pane-in 260ms var(--ease);
+}
+.layout-right[hidden] { display: none; }
+@keyframes pane-in {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.detail-close {
+  position: absolute;
+  top: 12px; right: 12px;
+  width: 34px; height: 34px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(15, 12, 8, 0.55);
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 160ms var(--ease), transform 160ms var(--ease);
+}
+.detail-close:hover { background: rgba(15, 12, 8, 0.8); transform: scale(1.05); }
+
+/* Big hero image at the top of the pane. */
+.detail-image {
+  aspect-ratio: 16 / 9;
+  background: var(--sky-soft);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+.detail-image img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.detail-body { padding: 0; }
+.detail-content { padding: 22px 26px 32px; }
+
+.detail-name {
+  font-family: "Fraunces", serif;
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+.detail-location {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.detail-tags {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.detail-take {
+  font-family: "Fraunces", serif;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--ink);
+  margin: 0 0 20px;
+  font-style: italic;
+}
+.detail-section {
+  margin-bottom: 20px;
+}
+.detail-section-title {
+  font-family: "Inter", sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+}
+.detail-dishes { display: flex; flex-wrap: wrap; gap: 6px; }
+.detail-sources {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.detail-sources a {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid transparent;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 160ms var(--ease), background 160ms var(--ease);
+}
+.detail-sources a:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.detail-hide {
+  margin-top: 16px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+  transition: border-color 160ms var(--ease), color 160ms var(--ease);
+}
+.detail-hide:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Selected-card highlight is defined below with the other .rcard styles
+   so it survives hover ordering. See `.rcard.is-selected` at ~line 393. */
+
+/* On narrow screens, the detail pane takes over the whole viewport —
+   the left grid is hidden while the pane is up. Close button returns
+   the user to the grid. */
+@media (max-width: 999px) {
+  .container.has-detail {
+    max-width: none; margin: 0; padding: 0;
+  }
+  .layout.has-detail { display: block; }
+  .layout.has-detail .layout-left { display: none; }
+  .layout.has-detail .layout-right {
+    position: fixed;
+    inset: 0;
+    max-height: none;
+    border-radius: 0;
+    border: none;
+    z-index: 100;
+    box-shadow: none;
+  }
 }
 
 /* -------- filters (new pill + dropdown UI) -------- */
@@ -389,12 +563,14 @@ a { color: inherit; text-decoration: none; }
   box-shadow: 0 14px 34px rgba(30, 20, 10, 0.10);
   border-color: #d8ccb6;
 }
-.rcard.is-expanded {
-  cursor: default;
+.rcard.is-selected {
   border-color: var(--accent);
-  box-shadow: 0 14px 34px rgba(178, 58, 46, 0.10);
+  box-shadow: 0 14px 34px rgba(178, 58, 46, 0.14);
 }
-.rcard.is-expanded:hover { transform: translateY(-2px); }
+.rcard.is-selected:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
 
 .rcard-primary {
   display: flex;

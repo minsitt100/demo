@@ -18,7 +18,7 @@ const state = {
       { label: "Past 90 days", value: 90 },
     ],
   },
-  expanded: new Set(),
+  selected: null,                 // key of the currently selected restaurant card (name.toLowerCase())
   openDropdown: null,             // which filter's dropdown is open
 };
 
@@ -123,6 +123,14 @@ function renderGrid() {
   for (const r of items) {
     grid.appendChild(renderCard(r));
   }
+  // If a card was selected but is no longer in the filtered view, close
+  // the detail pane. Otherwise keep the selection state visible on the
+  // newly-rendered matching card.
+  if (state.selected) {
+    const stillVisible = items.some((r) => r.name.toLowerCase() === state.selected);
+    if (!stillVisible) deselectRestaurant();
+    else updateSelectedCard();
+  }
 }
 
 function cuisineChip(cuisine) {
@@ -134,8 +142,7 @@ function cuisineChip(cuisine) {
 function renderCard(r) {
   const el = document.createElement("article");
   const id = r.name.toLowerCase();
-  const isExpanded = state.expanded.has(id);
-  el.className = "rcard" + (isExpanded ? " is-expanded" : "");
+  el.className = "rcard" + (state.selected === id ? " is-selected" : "");
   el.dataset.id = id;
 
   const nbhd = r.neighborhoods.length
@@ -176,32 +183,10 @@ function renderCard(r) {
       <span class="mention-count">${r.mentions} article${r.mentions === 1 ? "" : "s"}</span>
       <span class="rcard-foot-actions">
         <button class="rcard-hide" data-hide-name="${escapeHtml(r.name)}" title="Not a real restaurant / hide from feed">✕</button>
-        <button class="rcard-toggle" data-toggle="${id}">
-          ${isExpanded ? "Hide articles" : "Show articles"}
-          <span class="chev" aria-hidden="true">${isExpanded ? "▴" : "▾"}</span>
-        </button>
       </span>
     </footer>
-    <div class="rcard-expanded" ${isExpanded ? "" : "hidden"}>
-      <h4 class="expanded-title">Referenced in</h4>
-      <ul class="source-list">
-        ${r.sources.map((s) => `
-          <li>
-            <a href="${escapeHtml(s.url)}" target="_blank" rel="noreferrer">
-              <span class="src-label">${escapeHtml(s.source_label)}</span>
-              <span class="src-title">${escapeHtml(s.title)}</span>
-              <span class="src-date">${shortDate(s.published_at)}</span>
-            </a>
-          </li>
-        `).join("")}
-      </ul>
-    </div>
   `;
 
-  el.querySelector(".rcard-toggle")?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    toggleExpanded(id);
-  });
   el.querySelector(".rcard-hide")?.addEventListener("click", async (e) => {
     e.stopPropagation();
     const name = e.currentTarget.dataset.hideName;
@@ -225,32 +210,114 @@ function renderCard(r) {
       console.warn(err);
     }
   });
-  el.addEventListener("click", () => toggleExpanded(id));
+  // Clicking anywhere on the card selects it and opens the detail pane
+  // on the right. Clicking a card that's already selected closes the
+  // pane (toggle behavior).
+  el.addEventListener("click", () => {
+    if (state.selected === id) deselectRestaurant();
+    else selectRestaurant(r);
+  });
   return el;
 }
 
-function toggleExpanded(id) {
-  const isOpen = state.expanded.has(id);
-  if (isOpen) state.expanded.delete(id);
-  else state.expanded.add(id);
-  // Toggle just this one card instead of re-rendering the whole grid —
-  // otherwise every card's image reloads and the page flickers on each
-  // click. Update only the class and the hidden state of its expanded
-  // section, in place.
-  const card = document.querySelector(`.rcard[data-id="${CSS.escape(id)}"]`);
-  if (!card) return;
-  card.classList.toggle("is-expanded", !isOpen);
-  const expanded = card.querySelector(".rcard-expanded");
-  if (expanded) {
-    if (isOpen) expanded.setAttribute("hidden", "");
-    else expanded.removeAttribute("hidden");
-  }
-  const toggle = card.querySelector(".rcard-toggle");
-  if (toggle) {
-    const label = isOpen ? "Show articles" : "Hide articles";
-    const chev = isOpen ? "▾" : "▴";
-    toggle.innerHTML = `${label} <span class="chev" aria-hidden="true">${chev}</span>`;
-  }
+// ---------- master/detail pane ----------
+function selectRestaurant(r) {
+  const id = r.name.toLowerCase();
+  state.selected = id;
+  document.getElementById("container").classList.add("has-detail");
+  document.getElementById("layout").classList.add("has-detail");
+  const pane = document.getElementById("detail-pane");
+  pane.hidden = false;
+  renderDetailPane(r);
+  updateSelectedCard();
+  // On narrow (mobile) viewports the pane is a full-screen takeover.
+  // Scroll it to the top so the user starts from the hero image.
+  if (window.matchMedia("(max-width: 999px)").matches) pane.scrollTo(0, 0);
+}
+
+function deselectRestaurant() {
+  state.selected = null;
+  document.getElementById("container").classList.remove("has-detail");
+  document.getElementById("layout").classList.remove("has-detail");
+  document.getElementById("detail-pane").hidden = true;
+  updateSelectedCard();
+}
+
+function updateSelectedCard() {
+  document.querySelectorAll(".rcard").forEach((el) => {
+    el.classList.toggle("is-selected", el.dataset.id === state.selected);
+  });
+}
+
+function renderDetailPane(r) {
+  const body = document.getElementById("detail-body");
+  const nbhd = r.neighborhoods?.length ? r.neighborhoods.slice(0, 2).join(" · ") : "Chicago";
+  const dishes = Array.isArray(r.topDishes) ? r.topDishes : [];
+  const take = r.take || r.blurb;
+  const imageHtml = r.imageUrl
+    ? `<div class="detail-image"><img src="${escapeHtml(r.imageUrl)}" alt="" onerror="this.parentElement.remove()"></div>`
+    : "";
+
+  body.innerHTML = `
+    ${imageHtml}
+    <div class="detail-content">
+      <h2 class="detail-name">${escapeHtml(r.name)}</h2>
+      <div class="detail-location">
+        <span class="loc-icon" aria-hidden="true">📍</span>
+        <span>${escapeHtml(nbhd)}</span>
+      </div>
+      <div class="detail-tags">
+        ${cuisineChip(r.cuisine)}
+        ${r.priceBand ? `<span class="price-tag">${escapeHtml(r.priceBand)}</span>` : ""}
+        ${r.firstSeen ? `<span class="since-tag">Since ${shortDate(r.firstSeen)}</span>` : ""}
+      </div>
+      ${take ? `<p class="detail-take">“${escapeHtml(take)}”</p>` : ""}
+      ${dishes.length ? `
+        <div class="detail-section">
+          <div class="detail-section-title">Order</div>
+          <div class="detail-dishes">
+            ${dishes.slice(0, 8).map((d) => `<span class="dish">${escapeHtml(d)}</span>`).join("")}
+          </div>
+        </div>
+      ` : ""}
+      <div class="detail-section">
+        <div class="detail-section-title">Referenced in ${r.mentions} article${r.mentions === 1 ? "" : "s"}</div>
+        <ul class="detail-sources">
+          ${r.sources.map((s) => `
+            <li>
+              <a href="${escapeHtml(s.url)}" target="_blank" rel="noreferrer">
+                <span class="src-label">${escapeHtml(s.source_label)}</span>
+                <span class="src-title">${escapeHtml(s.title)}</span>
+                <span class="src-date">${shortDate(s.published_at)}</span>
+              </a>
+            </li>
+          `).join("")}
+        </ul>
+      </div>
+      <button class="detail-hide" data-hide-name="${escapeHtml(r.name)}">Hide this restaurant from my feed</button>
+    </div>
+  `;
+
+  body.querySelector(".detail-hide")?.addEventListener("click", async (e) => {
+    const name = e.currentTarget.dataset.hideName;
+    if (!confirm(`Hide "${name}" from your feed?`)) return;
+    try {
+      const res = await api("/api/restaurants/hide", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      toast(`Hidden (${res.hidden} article${res.hidden === 1 ? "" : "s"})`);
+      // Drop the card from the grid and close the pane.
+      const card = document.querySelector(`.rcard[data-id="${CSS.escape(state.selected)}"]`);
+      if (card) card.remove();
+      deselectRestaurant();
+      loadStatus();
+    } catch (err) {
+      toast("Hide failed");
+      console.warn(err);
+    }
+  });
 }
 
 function renderCounts() {
@@ -525,9 +592,16 @@ document.addEventListener("click", (e) => {
   if (!state.openDropdown) return;
   if (!e.target.closest(".filter-pill-wrap")) closeDropdown();
 });
-// Esc closes the open dropdown
+// Esc closes the open dropdown OR the detail pane, whichever's on top.
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeDropdown();
+  if (e.key !== "Escape") return;
+  if (state.openDropdown) closeDropdown();
+  else if (state.selected) deselectRestaurant();
+});
+// Close button on the detail pane
+document.getElementById("detail-close")?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  deselectRestaurant();
 });
 // Active-filter chips — event delegation on the list, so newly-rendered
 // chips always work without re-attaching per render. Clicking anywhere
