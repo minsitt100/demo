@@ -6,6 +6,7 @@ import { dbApi } from "./db.js";
 import { sources } from "./sources/index.js";
 import { runAllSources } from "./scraper.js";
 import { looksLikeArticleTitle } from "./name-filter.js";
+import { isEvergreenUrl } from "./url-filter.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -182,6 +183,10 @@ async function aggregateRestaurants(openings) {
 
   for (const o of openings) {
     if (!activeSourceIds.has(o.source)) continue;
+    // Skip "evergreen guide" articles — best-of lists, hit lists,
+    // greatest-hits maps. This app is scoped to NEW restaurants, and
+    // those articles are about long-standing favorites, not openings.
+    if (isEvergreenUrl(o.url)) continue;
     // Distinguish "never attempted" (NULL) from "attempted, found nothing"
     // (empty JSON array). If an extractor already ran and returned nothing,
     // trust that — don't fall back to the noisy title-guess.

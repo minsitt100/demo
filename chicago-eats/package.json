@@ -16,6 +16,7 @@
     "backfill:images": "node scripts/backfill-images.js",
     "backfill:photos": "node scripts/backfill-photos.js",
     "doctor:photos": "node scripts/doctor-photos.js",
+    "hide:evergreen": "node scripts/hide-evergreen.js",
     "peek:feed": "node scripts/peek-feed.js",
     "debug:extract": "node scripts/debug-extract.js"
   },
