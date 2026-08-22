@@ -22,13 +22,16 @@ export const meta = {
   // update roughly monthly; 7 days is comfortable headroom.
   reExtractEveryDays: 7,
   articles: [
-    // Testing scope: keep just the "new openings" guide until we verify
-    // the extractor is pulling the individual restaurants correctly.
-    // Add "best-new-chicago-restaurants-hit-list" and
-    // "best-restaurants-chicago" back once this one looks right.
+    // Two active guides — both on-topic for a "new restaurants" app.
+    // Do NOT add "best-restaurants-chicago" here; that's the evergreen
+    // greatest-hits list and it's blocked by url-filter.js on purpose.
     {
       url: "https://www.theinfatuation.com/chicago/guides/new-chicago-restaurant-openings",
       title: "The Infatuation — New Chicago Restaurant Openings",
+    },
+    {
+      url: "https://www.theinfatuation.com/chicago/guides/best-new-chicago-restaurants-hit-list",
+      title: "The Infatuation — Best New Chicago Restaurants Hit List",
     },
   ],
 };
