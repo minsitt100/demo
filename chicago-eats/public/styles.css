@@ -560,16 +560,27 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* -------- restaurant grid -------- */
-/* Column count is capped at 3: `max(220px, 33.333%)` means each column
-   is at least a third of the grid's width, so no more than three fit
-   across even on a very wide monitor. Below the point where three
-   220px-wide cards can fit, columns drop to 2, then 1. The 220px floor
-   is intentionally low so 3 columns still fit when the detail pane is
-   open on a typical laptop viewport. */
+/* Default is ALWAYS 3 columns — cards shrink/grow to fit. Responsive
+   breakpoints drop to 2 columns on narrow browser windows and 1 on
+   phones. `minmax(0, 1fr)` on each column lets them squeeze down when
+   the parent width is tight (e.g. detail pane open on a laptop). */
 .rgrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(max(220px, 33.333%), 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
+}
+@media (max-width: 900px) {
+  .rgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .rgrid { grid-template-columns: 1fr; }
+}
+/* When the detail pane is open, keep the grid at 3 unless the viewport
+   is truly cramped — then drop to 2 for readability. Below 1099px the
+   pane takes over full-screen (see below), so no split-view case at
+   very narrow widths. */
+@media (max-width: 1280px) {
+  .layout.has-detail .rgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .rcard {
