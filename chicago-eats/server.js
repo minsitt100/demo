@@ -86,11 +86,13 @@ function cleanBlurb(blurb, name) {
   return t.trim();
 }
 
-// Split a raw cuisine string into individual normalized cuisines. Handles
-// combined forms ("Bakery/Cafe", "Italian & Pizza", "Mexican and American")
-// by splitting on common separators, then singularizes obvious plurals so
-// "Cafes" / "Cafe" / "Bakery/Cafe" all end up as ["Cafe"] or ["Bakery", "Cafe"]
-// instead of three separate filter entries.
+// Split a raw cuisine string into individual normalized cuisines. Handles:
+//   - Combined forms ("Bakery/Cafe", "Italian & Pizza") → split into parts
+//   - Trailing venue-type words ("Filipino Cocktail Lounge") → strip suffix
+//   - Parenthetical qualifiers ("Global (Indian)") → prefer parenthetical
+//   - Curated aliases → canonical form
+//   - Plurals ("Cafes" → "Cafe")
+//   - Obvious non-cuisines ("Spice Route", 4+ word phrases) → drop
 const CUISINE_PLURALS = {
   Cafes: "Cafe",
   Cafés: "Café",
@@ -106,6 +108,44 @@ const CUISINE_PLURALS = {
   Diners: "Diner",
 };
 
+// Trailing venue-type words that dilute the cuisine (e.g. "Filipino
+// Cocktail Lounge" → "Filipino"). Applied only when there's a real
+// cuisine word before them, so plain "Cafe" or "Bar" stays intact.
+const VENUE_SUFFIX_RE = /\s+(cocktail\s+lounge|lounge|restaurant|kitchen|eatery|bar\s+&\s+grill|bistro|room|hall|house|joint|spot|shop|tavern)s?\s*$/i;
+
+// Curated alias table. LHS is the lowercased raw form we see from the
+// extractor; RHS is the canonical cuisine we want to display and filter
+// on. Add rows here as new bad values show up in the data.
+const CUISINE_ALIASES = {
+  "global (indian)": "Indian",
+  "global indian": "Indian",
+  "modern indian": "Indian",
+  "contemporary indian": "Indian",
+  "pan-asian": "Asian Fusion",
+  "pan asian": "Asian Fusion",
+  "modern american": "New American",
+  "contemporary american": "New American",
+};
+
+// Explicit blocklist for cuisine values that look like restaurant names
+// or generic phrases. These slip past the LLM when the article's own
+// language is ambiguous. Grow this list as more show up.
+const CUISINE_BLOCKLIST = new Set([
+  "spice route",
+  "farm to table",
+  "farm-to-table",
+  "chef driven",
+  "chef-driven",
+  "date night",
+  "special occasion",
+  "casual dining",
+  "fine dining",
+  "hip",
+  "trendy",
+  "cool",
+  "new",
+]);
+
 function titleCaseWord(w) {
   if (!w) return w;
   return w[0].toUpperCase() + w.slice(1).toLowerCase();
@@ -117,6 +157,38 @@ function normalizeCuisines(raw) {
     .split(/\s*[\/&,]\s*|\s+and\s+/i)
     .map((s) => s.trim())
     .filter(Boolean)
+    .flatMap((part) => {
+      // "Global (Indian)" → prefer the parenthetical when it's specific.
+      const paren = part.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+      if (paren) {
+        const inside = paren[2].trim();
+        // If the parenthetical is a plausible cuisine word, use it.
+        if (inside && inside.split(/\s+/).length <= 3) return [inside];
+      }
+      return [part];
+    })
+    .map((part) => {
+      // Alias table wins.
+      const key = part.toLowerCase().trim();
+      if (CUISINE_ALIASES[key]) return CUISINE_ALIASES[key];
+      // Strip trailing venue-type words when there's a real cuisine
+      // word before them. "Filipino Cocktail Lounge" → "Filipino".
+      const stripped = part.replace(VENUE_SUFFIX_RE, "").trim();
+      // Only accept the strip if it left at least one word AND wasn't
+      // a bare venue label like "Cocktail Lounge" itself.
+      if (stripped && stripped !== part && stripped.length >= 3) return stripped;
+      return part;
+    })
+    .filter((part) => {
+      if (!part) return false;
+      // Reject known non-cuisines.
+      if (CUISINE_BLOCKLIST.has(part.toLowerCase())) return false;
+      // Reject 4+ word phrases — real cuisines are rarely that long
+      // ("Middle Eastern" and "New American" are 2 words; nothing
+      // legitimate needs more than 3).
+      if (part.split(/\s+/).length > 3) return false;
+      return true;
+    })
     .map((part) => {
       // Preserve embedded hyphens/apostrophes; title-case each word chunk
       const cased = part.replace(/[A-Za-z]+/g, titleCaseWord);
