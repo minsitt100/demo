@@ -124,25 +124,23 @@ a { color: inherit; text-decoration: none; }
   background: #9a3327;
   box-shadow: 0 4px 12px rgba(178, 58, 46, 0.25);
 }
-/* Secondary — outlined, sits alongside the primary Refresh button.
-   Used by the header's Filters toggle. The .is-active state indicates
-   the filter section is currently expanded (chevron rotates, subtle
-   accent-tinted fill). */
+/* Secondary — outlined in accent, sits alongside the primary Refresh
+   button. Used by the header's Filters toggle. Uses the same red as
+   Refresh's fill so the two feel like a matched pair. The .is-active
+   state (filters expanded) fills the button with the accent-soft
+   tint and rotates the chevron 180°. */
 .btn.secondary {
   background: transparent;
-  color: var(--ink);
-  border: 1px solid var(--line);
-  font-weight: 500;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+  font-weight: 600;
 }
 .btn.secondary:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--accent-soft);
   transform: translateY(-1px);
 }
 .btn.secondary.is-active {
   background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
 }
 .btn.secondary .btn-icon-svg,
 .btn.secondary .filter-btn-chev { color: currentColor; }
