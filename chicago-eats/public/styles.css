@@ -559,14 +559,14 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* -------- restaurant grid -------- */
-/* auto-fit + minmax(280px, 1fr) lets the grid decide column count based
-   on ACTUAL available width — so when the detail pane opens and the
-   grid shrinks to ~55% of the viewport, cards reflow from 3 → 2 → 1
-   columns as space runs out. Works the same on a narrow browser window
-   or on a phone: no viewport-count guesses. */
+/* Column count is capped at 3: `max(280px, 33.333%)` means each column
+   is at least a third of the grid's width, so no more than three fit
+   across even on a very wide monitor. Below the point where three
+   280px-wide cards can fit, columns drop to 2, then 1. Works the same
+   whether the detail pane is open (grid is squeezed) or closed. */
 .rgrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(max(280px, 33.333%), 1fr));
   gap: 20px;
 }
 
