@@ -150,9 +150,11 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* Right pane: sticky so it stays put as you scroll the grid; scrolls
-   internally when its content is taller than the viewport. Its top
-   offset is the combined height of the sticky header + filters bar,
-   kept in sync from JS via the --sticky-body-top CSS variable. */
+   INTERNALLY when its content is taller than the visible viewport
+   below the sticky bars. Max-height is anchored to the viewport
+   minus the sticky-body-top offset (header + filters), so the pane
+   always fits above the fold and its content becomes scrollable
+   inside the pane — not stuck below the page. */
 .layout-right {
   position: sticky;
   top: var(--sticky-body-top, 240px);
@@ -161,7 +163,7 @@ a { color: inherit; text-decoration: none; }
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow-y: auto;
-  max-height: calc(100vh - 56px);
+  max-height: calc(100vh - var(--sticky-body-top, 240px) - 24px);
   animation: pane-in 260ms var(--ease);
 }
 .layout-right[hidden] { display: none; }
@@ -280,10 +282,11 @@ a { color: inherit; text-decoration: none; }
 
 /* On narrow screens, the detail pane takes over the whole viewport —
    the left grid is hidden while the pane is up. Close button returns
-   the user to the grid. */
-@media (max-width: 999px) {
+   the user to the grid. Breakpoint chosen so the split view only
+   shows when there's room for at least a 2-column grid + the pane. */
+@media (max-width: 1099px) {
   .container.has-detail {
-    max-width: none; margin: 0; padding: 0;
+    padding: 0;
   }
   .layout.has-detail { display: block; }
   .layout.has-detail .layout-left { display: none; }
@@ -296,6 +299,14 @@ a { color: inherit; text-decoration: none; }
     z-index: 100;
     box-shadow: none;
   }
+}
+
+/* Even without detail, at narrow widths tighten the container padding
+   so cards get maximum breathing room. */
+@media (max-width: 720px) {
+  .container { padding: 20px 16px 60px; }
+  .filters-section { margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; }
+  .header-inner { padding: 12px 16px; }
 }
 
 /* -------- filters (new pill + dropdown UI) -------- */
@@ -509,13 +520,16 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* -------- restaurant grid -------- */
+/* auto-fit + minmax(280px, 1fr) lets the grid decide column count based
+   on ACTUAL available width — so when the detail pane opens and the
+   grid shrinks to ~55% of the viewport, cards reflow from 3 → 2 → 1
+   columns as space runs out. Works the same on a narrow browser window
+   or on a phone: no viewport-count guesses. */
 .rgrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 20px;
 }
-@media (max-width: 960px) { .rgrid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 620px) { .rgrid { grid-template-columns: 1fr; } }
 
 .rcard {
   background: var(--paper);
