@@ -3,11 +3,21 @@
   --paper: #ffffff;
   --ink: #1a1613;
   --ink-soft: #5a5147;
-  --ink-faint: #9a9084;
+  /* Tertiary text — darkened from #9a9084 (~3:1) to #524a3f (~8:1)
+     to clear WCAG 2.1 AAA (7:1) on both bg and paper backgrounds.
+     Visual hierarchy against --ink-soft is preserved via existing
+     uppercase + smaller font-size treatments on tertiary labels. */
+  --ink-faint: #524a3f;
   --line: #ebe4d8;
-  --accent: #b23a2e;
+  /* Accent red — darkened from #b23a2e (~6:1) to #8f2318 (~8.7:1)
+     so it hits AAA (7:1) both as text on light backgrounds and as
+     a background with white text (Refresh button). */
+  --accent: #8f2318;
+  --accent-hover: #6f1a11;
   --accent-soft: #f4dad4;
-  --sky: #4b7ba8;
+  /* Source link blue — darkened from #4b7ba8 (~4.4:1) to #2d5478
+     (~8.3:1) to clear AAA on white. */
+  --sky: #2d5478;
   --sky-soft: #dae6f0;
   --sun: #e6b34a;
   --radius: 14px;
@@ -111,7 +121,7 @@ a { color: inherit; text-decoration: none; }
 }
 .btn.primary:hover {
   transform: translateY(-1px);
-  background: #9a3327;                 /* slightly darker accent */
+  background: var(--accent-hover);     /* slightly darker accent */
   box-shadow: 0 4px 12px rgba(178, 58, 46, 0.25);
 }
 .btn.ghost {
@@ -121,7 +131,7 @@ a { color: inherit; text-decoration: none; }
 }
 .btn.ghost:hover {
   transform: translateY(-1px);
-  background: #9a3327;
+  background: var(--accent-hover);
   box-shadow: 0 4px 12px rgba(178, 58, 46, 0.25);
 }
 /* Secondary — outlined in accent, sits alongside the primary Refresh
@@ -215,12 +225,13 @@ a { color: inherit; text-decoration: none; }
 .detail-close {
   position: absolute;
   top: 12px; right: 12px;
-  width: 34px; height: 34px;
+  /* AAA WCAG 2.5.5: 44×44 minimum target size. */
+  width: 44px; height: 44px;
   border-radius: 999px;
   border: none;
   background: rgba(15, 12, 8, 0.55);
   color: white;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   z-index: 3;
@@ -812,7 +823,10 @@ a { color: inherit; text-decoration: none; }
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  /* AAA WCAG 2.5.5: at least 44px in the constrained axis. Vertical
+     padding brings the pill to 44px tall with the text centered. */
+  padding: 12px 12px;
+  min-height: 44px;
   border-radius: 999px;
   transition: background 160ms var(--ease);
 }
@@ -965,8 +979,17 @@ a { color: inherit; text-decoration: none; }
   color: var(--ink-faint);
   cursor: pointer;
   font-size: 13px;
+  /* AAA WCAG 2.5.5: 44×44 minimum target size. The ✕ glyph stays
+     visually small; the surrounding transparent area is the click
+     zone. Displays as a centered inline-flex so the glyph sits in
+     the middle of the 44px box. */
+  min-width: 44px;
+  min-height: 44px;
   padding: 4px 8px;
   border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: color 160ms var(--ease), background 160ms var(--ease);
 }
 .rcard-hide:hover {
@@ -1001,4 +1024,41 @@ a { color: inherit; text-decoration: none; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* -------- enhanced focus indicators (WCAG 2.4.13 AAA) --------
+   Every interactive element gets a 3px accent outline with 2px offset
+   on keyboard focus. Contrast between the outline and adjacent
+   backgrounds exceeds 3:1 (accent #8f2318 is ~8.7:1 on white/bg).
+   :focus-visible only fires on keyboard focus, so mouse clicks don't
+   trigger a permanent outline. */
+:focus { outline: none; }
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Rounded elements get the outline shaped to their radius. */
+.btn:focus-visible,
+.filter-pill:focus-visible,
+.rcard-hide:focus-visible,
+.rcard-toggle:focus-visible,
+.detail-close:focus-visible,
+.detail-hide:focus-visible,
+.dropdown-option:focus-visible,
+.active-filter-chip:focus-visible,
+.clear-filters:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Cards get a focus outline that hugs their rounded corners. */
+.rcard:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+/* Detail-close sits on a photo — needs a white halo underneath the
+   accent outline to guarantee 3:1 contrast against any image. */
+.detail-close:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px white;
 }
