@@ -502,11 +502,46 @@ function refreshUI() {
   renderActiveFilters();
   renderGrid();
   renderCounts();
+  updateFilterButton();
   // If a dropdown is open, re-render it to reflect the new selection state
   if (state.openDropdown) renderDropdown(state.openDropdown);
   // Filter bar height changes when active-filters shows/hides — keep
   // the detail pane's sticky top offset aligned so it never underlaps
   // the filter bar.
+  updateStickyOffsets();
+}
+
+// Sync the header Filters button: badge count for active filters, and
+// the is-active class reflecting whether the filter section is expanded.
+function updateFilterButton() {
+  const btn = document.getElementById("filter-btn");
+  const badge = document.getElementById("filter-btn-badge");
+  const section = document.getElementById("filters-section");
+  if (!btn || !badge || !section) return;
+  const active =
+    state.filters.cuisine.size +
+    state.filters.price.size +
+    state.filters.neighborhood.size +
+    (state.filters.timePeriod !== 90 ? 1 : 0);
+  if (active > 0) {
+    badge.hidden = false;
+    badge.textContent = String(active);
+  } else {
+    badge.hidden = true;
+  }
+  const isOpen = !section.hidden;
+  btn.classList.toggle("is-active", isOpen);
+  btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
+
+function toggleFilterSection() {
+  const section = document.getElementById("filters-section");
+  if (!section) return;
+  section.hidden = !section.hidden;
+  // Close any open filter dropdown when collapsing — dropdowns
+  // anchored to a hidden section are visually orphaned.
+  if (section.hidden && state.openDropdown) closeDropdown();
+  updateFilterButton();
   updateStickyOffsets();
 }
 
@@ -654,6 +689,12 @@ $("#active-filters-list").addEventListener("keydown", (e) => {
 $("#clear-filters").addEventListener("click", (e) => {
   e.stopPropagation();
   clearAllFilters();
+});
+
+// Header Filters button: toggle the whole filter section open/closed.
+$("#filter-btn")?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleFilterSection();
 });
 
 $("#refresh-btn").addEventListener("click", async () => {
