@@ -182,8 +182,9 @@ a { color: inherit; text-decoration: none; }
 .layout.has-detail {
   display: grid;
   /* Grid on the left keeps its 3-col shape; detail pane on the right
-     is a wide, fixed-ish column with room for future features. */
-  grid-template-columns: minmax(0, 1fr) minmax(460px, 560px);
+     is a wide, fixed-ish column with room for future features. Min
+     tuned so a typical laptop still fits 3 cards in the left grid. */
+  grid-template-columns: minmax(0, 1fr) minmax(400px, 520px);
   gap: 32px;
   align-items: flex-start;
 }
@@ -559,14 +560,15 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* -------- restaurant grid -------- */
-/* Column count is capped at 3: `max(280px, 33.333%)` means each column
+/* Column count is capped at 3: `max(220px, 33.333%)` means each column
    is at least a third of the grid's width, so no more than three fit
    across even on a very wide monitor. Below the point where three
-   280px-wide cards can fit, columns drop to 2, then 1. Works the same
-   whether the detail pane is open (grid is squeezed) or closed. */
+   220px-wide cards can fit, columns drop to 2, then 1. The 220px floor
+   is intentionally low so 3 columns still fit when the detail pane is
+   open on a typical laptop viewport. */
 .rgrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(max(280px, 33.333%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(max(220px, 33.333%), 1fr));
   gap: 20px;
 }
 
