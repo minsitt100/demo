@@ -404,11 +404,16 @@ async function aggregateRestaurants(openings) {
         c.imageUrl = cached.photo_url;
         continue;
       }
-      // Shared OG + no per-place photo → drop the image entirely. Better
-      // to show no image than the shared roundup hero (the "tostada"
-      // problem). The card still renders — the frontend omits the image
-      // element when imageUrl is null.
-      if (shared) {
+      // Shared OG + we've already tried Google and it had nothing →
+      // drop the image (better than the shared roundup hero).
+      if (cached && !cached.photo_url && shared) {
+        c.imageUrl = null;
+      }
+      // Shared OG + no cache entry yet: only drop the image if we can
+      // realistically replace it via a background fetch. In UI-only /
+      // read-only mode (USE_PHOTO_FETCHER off) we keep the OG so the
+      // card doesn't render permanently image-less.
+      else if (!cached && shared && USE_PHOTO_FETCHER) {
         c.imageUrl = null;
       }
       // Non-shared unique OG → keep it as the editorial hero photo.
